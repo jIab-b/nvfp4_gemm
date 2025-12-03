@@ -32,68 +32,52 @@ static constexpr int N_TILE = 4;
 struct Gemm_params {
     using index_t = uint64_t;
     int m, n, k;
-    const __nv_fp4x2_e2m1* __restrict__ a_ptr;
-    const __nv_fp4x2_e2m1* __restrict__ b_ptr;
-    const __nv_fp8_e4m3* __restrict__ sfa_ptr;
-    const __nv_fp8_e4m3* __restrict__ sfb_ptr;
+    const uint8_t* __restrict__ a_ptr;
+    const uint8_t* __restrict__ b_ptr;
+    const uint8_t* __restrict__ sfa_ptr;
+    const uint8_t* __restrict__ sfb_ptr;
     __half* __restrict__ c_ptr;
     index_t row_stride;
     index_t sf_row_stride;
 };
 
-__device__ __forceinline__ void load_row_block(
-    const __nv_fp4x2_e2m1* row_ptr,
-    const __nv_fp8_e4m3*   row_scale_ptr,
-    int                    elem_base,
-    int                    block_base,
-    __nv_fp4x2_e2m1 (&a_regs)[2],
-    __nv_fp8_e4m3 &sfa_regs)
-{
-    a_regs[0] = row_ptr[elem_base];
-    a_regs[1] = row_ptr[elem_base + 1];
-    sfa_regs = row_scale_ptr[block_base];
+__device__ __forceinline__ __half2 decode_fp4x2(uint8_t byte) {
+    __half2_raw raw = __nv_cvt_fp4x2_to_halfraw2(
+        static_cast<__nv_fp4x2_storage_t>(byte),
+        __NV_E2M1
+    );
+    return *reinterpret_cast<__half2*>(&raw);
 }
 
-__device__ __forceinline__ void load_col_block(
-    const __nv_fp4x2_e2m1* col_ptr,
-    const __nv_fp8_e4m3*   col_scale_ptr,
-    int                    elem_base,
-    int                    block_base,
-    __nv_fp4x2_e2m1 (&b_regs)[2],
-    __nv_fp8_e4m3 &sfb_regs)
-{
-    b_regs[0] = col_ptr[elem_base];
-    b_regs[1] = col_ptr[elem_base + 1];
-    sfb_regs = col_scale_ptr[block_base];
+__device__ __forceinline__ float decode_fp8(int8_t byte) {
+    __nv_fp8_storage_t storage = static_cast<__nv_fp8_storage_t>(byte);
+    __half_raw raw = __nv_cvt_fp8_to_halfraw(storage, __NV_E4M3);
+    return __half2float(__ushort_as_half(raw.x));
 }
 
 __device__ __forceinline__ float block_scaled_fma_16x2fp4(
-    const __nv_fp4x2_e2m1 (&a_regs)[2],
-    const __nv_fp4x2_e2m1 (&b_regs)[2],
-    __nv_fp8_e4m3 sfa_regs,
-    __nv_fp8_e4m3 sfb_regs)
+    const uint8_t (&a_bytes)[2],
+    const uint8_t (&b_bytes)[2],
+    int8_t sfa_byte,
+    int8_t sfb_byte)
 {
+    float scale = decode_fp8(sfa_byte) * decode_fp8(sfb_byte);
+    __half2 scale_h2 = __halves2half2(__float2half(scale), __float2half(scale));
+
     float accum = 0.0f;
 
-    // Convert scales from fp8 to half then to float (fp8 structs have cast operators)
-    __half sfa_half = static_cast<__half>(sfa_regs);
-    __half sfb_half = static_cast<__half>(sfb_regs);
-    float sfa = __half2float(sfa_half);
-    float sfb = __half2float(sfb_half);
-    float scale = sfa * sfb;
+    // Decode and multiply first pair of bytes
+    __half2 a_h2_0 = decode_fp4x2(a_bytes[0]);
+    __half2 b_h2_0 = decode_fp4x2(b_bytes[0]);
+    __half2 prod_0 = __hmul2(a_h2_0, __hmul2(b_h2_0, scale_h2));
 
-    // Each fp4x2 holds two fp4 values; convert once per register.
-    __half2 a_h2_0 = __half2(__nv_cvt_fp4x2_to_halfraw2(a_regs[0].__x, __NV_E2M1));
-    __half2 b_h2_0 = __half2(__nv_cvt_fp4x2_to_halfraw2(b_regs[0].__x, __NV_E2M1));
-    __half2 prod_0 = __hmul2(a_h2_0, b_h2_0);
-    accum += __half2float(prod_0.x) + __half2float(prod_0.y);
+    // Decode and multiply second pair of bytes
+    __half2 a_h2_1 = decode_fp4x2(a_bytes[1]);
+    __half2 b_h2_1 = decode_fp4x2(b_bytes[1]);
+    __half2 prod_1 = __hfma2(a_h2_1, __hmul2(b_h2_1, scale_h2), prod_0);
 
-    __half2 a_h2_1 = __half2(__nv_cvt_fp4x2_to_halfraw2(a_regs[1].__x, __NV_E2M1));
-    __half2 b_h2_1 = __half2(__nv_cvt_fp4x2_to_halfraw2(b_regs[1].__x, __NV_E2M1));
-    __half2 prod_1 = __hmul2(a_h2_1, b_h2_1);
-    accum += __half2float(prod_1.x) + __half2float(prod_1.y);
-
-    return accum * scale;
+    float2 res = __half22float2(prod_1);
+    return res.x + res.y;
 }
 
 template <int M_TILE, int K_WORKERS, int N_TILE>
@@ -116,11 +100,11 @@ gemm_kernel(const __grid_constant__ Gemm_params params)
         return;
     }
 
-    const __nv_fp4x2_e2m1* rowA = params.a_ptr + row * params.row_stride;
-    const __nv_fp8_e4m3* rowS = params.sfa_ptr + row * params.sf_row_stride;
+    const uint8_t* rowA = params.a_ptr + row * params.row_stride;
+    const uint8_t* rowS = params.sfa_ptr + row * params.sf_row_stride;
 
-    const __nv_fp4x2_e2m1* colB_ptrs[N_TILE];
-    const __nv_fp8_e4m3* colS_ptrs[N_TILE];
+    const uint8_t* colB_ptrs[N_TILE];
+    const uint8_t* colS_ptrs[N_TILE];
     bool col_active[N_TILE];
 
     #pragma unroll
@@ -139,28 +123,32 @@ gemm_kernel(const __grid_constant__ Gemm_params params)
 
     float accum[N_TILE] = {0.f};
 
-    const int bytes_per_iter = 16;
-    const int iters = params.k / (K_WORKERS * bytes_per_iter);
+    const int K_sf = params.k / 16;  // Scale factors (1 per 16 FP4 values = 8 bytes)
+    const int STRIDE = K_WORKERS;
 
     #pragma unroll 4
-    for (int iter = 0; iter < iters; ++iter) {
-        int block_base = iter * K_WORKERS + k_lane;
-        int elem_base = block_base * bytes_per_iter / 2;  // Divided by 2 since fp4x2 is 2 elements
-        int scale_block_base = block_base;
+    for (int sf_idx = k_lane; sf_idx < K_sf; sf_idx += STRIDE) {
+        int byte_base = sf_idx * 8;  // Each SF covers 8 bytes of FP4 data
 
-        __nv_fp4x2_e2m1 a_regs[2];
-        __nv_fp8_e4m3 sfa_reg;
-        load_row_block(rowA, rowS, elem_base, scale_block_base, a_regs, sfa_reg);
+        int8_t sfa_byte = rowS[sf_idx];
+
+        uint8_t a_bytes[2];
+        a_bytes[0] = rowA[byte_base];
+        a_bytes[1] = rowA[byte_base + 1];
 
         #pragma unroll
         for (int ci = 0; ci < N_TILE; ++ci) {
             if (!col_active[ci]) {
                 continue;
             }
-            __nv_fp4x2_e2m1 b_regs[2];
-            __nv_fp8_e4m3 sfb_reg;
-            load_col_block(colB_ptrs[ci], colS_ptrs[ci], elem_base, scale_block_base, b_regs, sfb_reg);
-            float result = block_scaled_fma_16x2fp4(a_regs, b_regs, sfa_reg, sfb_reg);
+
+            int8_t sfb_byte = colS_ptrs[ci][sf_idx];
+
+            uint8_t b_bytes[2];
+            b_bytes[0] = colB_ptrs[ci][byte_base];
+            b_bytes[1] = colB_ptrs[ci][byte_base + 1];
+
+            float result = block_scaled_fma_16x2fp4(a_bytes, b_bytes, sfa_byte, sfb_byte);
             accum[ci] += result;
         }
     }
@@ -205,10 +193,10 @@ torch::Tensor cuda_nvfp4_gemm_simple(
     params.m = M;
     params.n = N;
     params.k = K;
-    params.a_ptr = reinterpret_cast<const __nv_fp4x2_e2m1*>(A.data_ptr());
-    params.b_ptr = reinterpret_cast<const __nv_fp4x2_e2m1*>(B.data_ptr());
-    params.sfa_ptr = reinterpret_cast<const __nv_fp8_e4m3*>(SFA.data_ptr());
-    params.sfb_ptr = reinterpret_cast<const __nv_fp8_e4m3*>(SFB.data_ptr());
+    params.a_ptr = reinterpret_cast<const uint8_t*>(A.data_ptr());
+    params.b_ptr = reinterpret_cast<const uint8_t*>(B.data_ptr());
+    params.sfa_ptr = reinterpret_cast<const uint8_t*>(SFA.data_ptr());
+    params.sfb_ptr = reinterpret_cast<const uint8_t*>(SFB.data_ptr());
     params.c_ptr = reinterpret_cast<__half*>(C.data_ptr());
     params.row_stride = A.stride(0);
     params.sf_row_stride = SFA.stride(0);
