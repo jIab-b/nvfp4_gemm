@@ -1,0 +1,182 @@
+"**NVIDIA on GitHub ✅ success**
+> Workflow [19916556339](<https://github.com/gpu-mode/discord-cluster-manager/actions/runs/19916556339>) completed
+> Downloading artifacts... done
+> ❌ Benchmarking failed
+
+Running on:
+* GPU: `NVIDIA B200`
+* CPU: `INTEL(R) XEON(R) PLATINUM 8570`
+* Runtime: `CUDA`
+* Platform: `Linux-6.8.0-51-generic-x86_64-with-glibc2.35`
+* Torch: `2.9.1+cu130`
+
+
+## Benchmarks:
+```
+❌ k: 16384; l: 1; m: 128; n: 7168; seed: 1111 failed testing:
+
+mismatch found! custom implementation doesn't match reference: Number of mismatched elements: 89086 ERROR AT (0, 3, 0): 132.0 133.0 ERROR AT (0, 36, 0): -389.0 -389.5 ERROR AT (0, 56, 0): 349.0 347.75 ERROR AT (0, 58, 0): 88.5 89.0 ERROR AT (0, 59, 0): -18.5 -18.75 ... and 89081 more mismatched elements.
+
+❌ k: 7168; l: 1; m: 128; n: 4096; seed: 1111 failed testing:
+
+mismatch found! custom implementation doesn't match reference: Number of mismatched elements: 47720 ERROR AT (0, 0, 0): 51.25 51.0 ERROR AT (0, 31, 0): 469.25 468.75 ERROR AT (0, 45, 0): 765.0 764.0 ERROR AT (0, 58, 0): 897.0 898.0 ERROR AT (0, 70, 0): -265.0 -264.5 ... and 47715 more mismatched elements.
+
+❌ k: 2048; l: 1; m: 128; n: 7168; seed: 1111 failed testing:
+
+mismatch found! custom implementation doesn't match reference: Number of mismatched elements: 58089 ERROR AT (0, 11, 0): 172.25 172.0 ERROR AT (0, 15, 0): 211.0 210.75 ERROR AT (0, 19, 0): 185.25 185.5 ERROR AT (0, 21, 0): -93.0 -92.75 ERROR AT (0, 22, 0): -204.25 -204.5 ... and 58084 more mismatched elements.
+```
+
+## Program stdout:
+```
+[COMPUTE DEBUG] iter=0 tid=0: PTX=-86.000000, manual=-86.000000, scale0=0.000000, scale1=4.000000, match=YES
+[COMPUTE DEBUG] iter=0 tid=0: PTX=-62.000000, manual=-62.000000, scale0=6.000000, scale1=4.000000, match=YES
+[COMPUTE DEBUG] iter=0 tid=0: PTX=53.500000, manual=53.500000, scale0=2.000000, scale1=0.000000, match=YES
+[COMPUTE DEBUG] iter=0 tid=0: PTX=-280.000000, manual=-280.000000, scale0=6.000000, scale1=2.000000, match=YES
+[COMPUTE DEBUG] iter=0 tid=0: PTX=108.000000, manual=108.000000, scale0=3.000000, scale1=0.000000, match=YES
+[COMPUTE DEBUG] iter=0 tid=0: PTX=0.000000, manual=0.000000, scale0=0.000000, scale1=0.000000, match=YES
+[COMPUTE DEBUG] iter=0 tid=0: PTX=-107.500000, manual=-107.500000, scale0=4.000000, scale1=9.000000, match=YES
+[COMPUTE DEBUG] iter=0 tid=0: PTX=-97.500000, manual=-97.500000, scale0=2.000000, scale1=0.000000, match=YES
+[COMPUTE DEBUG] iter=0 tid=0: PTX=-391.500000, manual=-391.500000, scale0=4.000000, scale1=9.000000, match=YES
+[COMPUTE DEBUG] iter=0 tid=0: PTX=-20.500000, manual=-20.500000, scale0=0.000000, scale1=2.000000, match=YES
+[COMPUTE DEBUG] iter=0 tid=0: PTX=0.000000, manual=0.000000, scale0=0.000000, scale1=0.000000, match=YES
+[COMPUTE DEBUG] iter=0 tid=0: PTX=0.000000, manual=0.000000, scale0=0.000000, scale1=0.000000, match=YES
+[COMPUTE DEBUG] iter=0 tid=0: PTX=-57.250000, manual=-57.250000, scale0=2.000000, scale1=1.000000, match=YES
+[COMPUTE DEBUG] iter=0 tid=0: PTX=0.000000, manual=0.000000, scale0=2.000000, scale1=6.000000, match=YES
+[COMPUTE DEBUG] iter=0 tid=0: PTX=204.000000, manual=204.000000, scale0=1.000000, scale1=2.000000, match=YES
+[COMPUTE DEBUG] iter=0 tid=0: PTX=0.000000, manual=0.000000, scale0=0.000000, scale1=0.000000, match=YES
+[COMPUTE DEBUG] iter=0 tid=0: PTX=0.000000, manual=0.000000, scale0=0.000000, scale1=0.000000, match=YES
+[COMPUTE DEBUG] iter=0 tid=0: PTX=-123.000000, manual=-123.000000, scale0=3.000000, scale1=0.000000, match=YES
+[COMPUTE DEBUG] iter=0 tid=0: PTX=0.000000, manual=0.000000, scale0=0.000000, scale1=0.000000, match=YES
+[COMPUTE DEBUG] iter=0 tid=0: PTX=220.500000, manual=220.500000, scale0=6.000000, scale1=4.000000, match=YES
+[COMPUTE DEBUG] iter=0 tid=0: PTX=-145.500000, manual=-145.500000, scale0=2.000000, scale1=2.000000, match=YES
+[COMPUTE DEBUG] iter=0 tid=0: PTX=-535.500000, manual=-535.500000, scale0=9.000000, scale1=0.000000, match=YES
+[COMPUTE DEBUG] iter=0 tid=0: PTX=705.000000, manual=705.500000, scale0=9.000000, scale1=1.000000, match=NO
+[COMPUTE DEBUG] iter=0 tid=0: PTX=54.000000, manual=54.000000, scale0=6.000000, scale1=0.000000, match=YES
+[COMPUTE DEBUG] iter=0 tid=0: PTX=36.750000, manual=36.750000, scale0=0.000000, scale1=1.000000, match=YES
+[COMPUTE DEBUG] iter=0 tid=0: PTX=169.000000, manual=169.000000, scale0=0.000000, scale1=2.000000, match=YES
+[COMPUTE DEBUG] iter=0 tid=0: PTX=76.000000, manual=76.000000, scale0=4.000000, scale1=4.000000, match=YES
+[COMPUTE DEBUG] iter=0 tid=0: PTX=0.000000, manual=0.000000, scale0=0.000000, scale1=0.000000, match=YES
+[COMPUTE DEBUG] iter=0 tid=0: PTX=127.500000, manual=127.500000, scale0=0.000000, scale1=6.000000, match=YES
+[COMPUTE DEBUG] iter=0 tid=0: PTX=0.000000, manual=0.000000, scale0=0.000000, scale1=0.000000, match=YES
+[COMPUTE DEBUG] iter=0 tid=0: PTX=0.000000, manual=0.000000, scale0=0.000000, scale1=0.000000, match=YES
+[COMPUTE DEBUG] iter=0 tid=0: PTX=12.500000, manual=12.500000, scale0=2.000000, scale1=0.000000, match=YES
+[COMPUTE DEBUG] iter=0 tid=0: PTX=33.000000, manual=33.000000, scale0=3.000000, scale1=0.000000, match=YES
+[COMPUTE DEBUG] iter=0 tid=0: PTX=139.000000, manual=139.000000, scale0=0.000000, scale1=2.000000, match=YES
+[COMPUTE DEBUG] iter=0 tid=0: PTX=0.000000, manual=0.000000, scale0=0.000000, scale1=0.000000, match=YES
+[COMPUTE DEBUG] iter=0 tid=0: PTX=-33.500000, manual=-33.500000, scale0=6.000000, scale1=2.000000, match=YES
+[COMPUTE DEBUG] iter=0 tid=0: PTX=-299.000000, manual=-299.000000, scale0=2.000000, scale1=6.000000, match=YES
+[COMPUTE DEBUG] iter=0 tid=0: PTX=253.500000, manual=253.500000, scale0=0.000000, scale1=6.000000, match=YES
+[COMPUTE DEBUG] iter=0 tid=0: PTX=168.000000, manual=168.000000, scale0=0.000000, scale1=3.000000, match=YES
+[COMPUTE DEBUG] iter=0 tid=0: PTX=0.000000, manual=0.000000, scale0=0.000000, scale1=0.000000, match=YES
+[COMPUTE DEBUG] iter=0 tid=0: PTX=264.000000, manual=264.000000, scale0=0.000000, scale1=6.000000, match=YES
+[COMPUTE DEBUG] iter=0 tid=0: PTX=-9.500000, manual=-9.500000, scale0=6.000000, scale1=4.000000, match=YES
+[COMPUTE DEBUG] iter=0 tid=0: PTX=72.000000, manual=72.000000, scale0=3.000000, scale1=0.000000, match=YES
+[COMPUTE DEBUG] iter=0 tid=0: PTX=-39.250000, manual=-39.250000, scale0=1.000000, scale1=0.000000, match=YES
+[COMPUTE DEBUG] iter=0 tid=0: PTX=40.500000, manual=40.500000, scale0=3.000000, scale1=0.000000, match=YES
+[COMPUTE DEBUG] iter=0 tid=0: PTX=5.250000, manual=5.250000, scale0=1.000000, scale1=0.000000, match=YES
+[COMPUTE DEBUG] iter=0 tid=0: PTX=46.750000, manual=46.750000, scale0=0.000000, scale1=1.000000, match=YES
+[COMPUTE DEBUG] iter=0 tid=0: PTX=-301.500000, manual=-301.500000, scale0=0.000000, scale1=3.000000, match=YES
+[COMPUTE DEBUG] iter=0 tid=0: PTX=-87.750000, manual=-87.750000, scale0=1.000000, scale1=9.000000, match=YES
+[COMPUTE DEBUG] iter=0 tid=0: PTX=0.000000, manual=0.000000, scale0=0.000000, scale1=0.000000, match=YES
+[COMPUTE DEBUG] iter=0 tid=0: PTX=-86.000000, manual=-86.000000, scale0=0.000000, scale1=4.000000, match=YES
+[COMPUTE DEBUG] iter=0 tid=0: PTX=-62.000000, manual=-62.000000, scale0=6.000000, scale1=4.000000, match=YES
+[COMPUTE DEBUG] iter=0 tid=0: PTX=53.500000, manual=53.500000, scale0=2.000000, scale1=0.000000, match=YES
+[COMPUTE DEBUG] iter=0 tid=0: PTX=-280.000000, manual=-280.000000, scale0=6.000000, scale1=2.000000, match=YES
+[COMPUTE DEBUG] iter=0 tid=0: PTX=108.000000, manual=108.000000, scale0=3.000000, scale1=0.000000, match=YES
+[COMPUTE DEBUG] iter=0 tid=0: PTX=0.000000, manual=0.000000, scale0=0.000000, scale1=0.000000, match=YES
+[COMPUTE DEBUG] iter=0 tid=0: PTX=-107.500000, manual=-107.500000, scale0=4.000000, scale1=9.000000, match=YES
+[COMPUTE DEBUG] iter=0 tid=0: PTX=-97.500000, manual=-97.500000, scale0=2.000000, scale1=0.000000, match=YES
+[COMPUTE DEBUG] iter=0 tid=0: PTX=-391.500000, manual=-391.500000, scale0=4.000000, scale1=9.000000, match=YES
+[COMPUTE DEBUG] iter=0 tid=0: PTX=-20.500000, manual=-20.500000, scale0=0.000000, scale1=2.000000, match=YES
+[COMPUTE DEBUG] iter=0 tid=0: PTX=0.000000, manual=0.000000, scale0=0.000000, scale1=0.000000, match=YES
+[COMPUTE DEBUG] iter=0 tid=0: PTX=0.000000, manual=0.000000, scale0=0.000000, scale1=0.000000, match=YES
+[COMPUTE DEBUG] iter=0 tid=0: PTX=-57.250000, manual=-57.250000, scale0=2.000000, scale1=1.000000, match=YES
+[COMPUTE DEBUG] iter=0 tid=0: PTX=0.000000, manual=0.000000, scale0=2.000000, scale1=6.000000, match=YES
+[COMPUTE DEBUG] iter=0 tid=0: PTX=204.000000, manual=204.000000, scale0=1.000000, scale1=2.000000, match=YES
+[COMPUTE DEBUG] iter=0 tid=0: PTX=0.000000, manual=0.000000, scale0=0.000000, scale1=0.000000, match=YES
+[COMPUTE DEBUG] iter=0 tid=0: PTX=0.000000, manual=0.000000, scale0=0.000000, scale1=0.000000, match=YES
+[COMPUTE DEBUG] iter=0 tid=0: PTX=-123.000000, manual=-123.000000, scale0=3.000000, scale1=0.000000, match=YES
+[COMPUTE DEBUG] iter=0 tid=0: PTX=0.000000, manual=0.000000, scale0=0.000000, scale1=0.000000, match=YES
+[COMPUTE DEBUG] iter=0 tid=0: PTX=220.500000, manual=220.500000, scale0=6.000000, scale1=4.000000, match=YES
+[COMPUTE DEBUG] iter=0 tid=0: PTX=-145.500000, manual=-145.500000, scale0=2.000000, scale1=2.000000, match=YES
+[COMPUTE DEBUG] iter=0 tid=0: PTX=-535.500000, manual=-535.500000, scale0=9.000000, scale1=0.000000, match=YES
+[COMPUTE DEBUG] iter=0 tid=0: PTX=705.000000, manual=705.500000, scale0=9.000000, scale1=1.000000, match=NO
+[COMPUTE DEBUG] iter=0 tid=0: PTX=54.000000, manual=54.000000, scale0=6.000000, scale1=0.000000, match=YES
+[COMPUTE DEBUG] iter=0 tid=0: PTX=36.750000, manual=36.750000, scale0=0.000000, scale1=1.000000, match=YES
+[COMPUTE DEBUG] iter=0 tid=0: PTX=169.000000, manual=169.000000, scale0=0.000000, scale1=2.000000, match=YES
+[COMPUTE DEBUG] iter=0 tid=0: PTX=76.000000, manual=76.000000, scale0=4.000000, scale1=4.000000, match=YES
+[COMPUTE DEBUG] iter=0 tid=0: PTX=0.000000, manual=0.000000, scale0=0.000000, scale1=0.000000, match=YES
+[COMPUTE DEBUG] iter=0 tid=0: PTX=127.500000, manual=127.500000, scale0=0.000000, scale1=6.000000, match=YES
+[COMPUTE DEBUG] iter=0 tid=0: PTX=0.000000, manual=0.000000, scale0=0.000000, scale1=0.000000, match=YES
+[COMPUTE DEBUG] iter=0 tid=0: PTX=0.000000, manual=0.000000, scale0=0.000000, scale1=0.000000, match=YES
+[COMPUTE DEBUG] iter=0 tid=0: PTX=12.500000, manual=12.500000, scale0=2.000000, scale1=0.000000, match=YES
+[COMPUTE DEBUG] iter=0 tid=0: PTX=33.000000, manual=33.000000, scale0=3.000000, scale1=0.000000, match=YES
+[COMPUTE DEBUG] iter=0 tid=0: PTX=139.000000, manual=139.000000, scale0=0.000000, scale1=2.000000, match=YES
+[COMPUTE DEBUG] iter=0 tid=0: PTX=0.000000, manual=0.000000, scale0=0.000000, scale1=0.000000, match=YES
+[COMPUTE DEBUG] iter=0 tid=0: PTX=-33.500000, manual=-33.500000, scale0=6.000000, scale1=2.000000, match=YES
+[COMPUTE DEBUG] iter=0 tid=0: PTX=-299.000000, manual=-299.000000, scale0=2.000000, scale1=6.000000, match=YES
+[COMPUTE DEBUG] iter=0 tid=0: PTX=253.500000, manual=253.500000, scale0=0.000000, scale1=6.000000, match=YES
+[COMPUTE DEBUG] iter=0 tid=0: PTX=168.000000, manual=168.000000, scale0=0.000000, scale1=3.000000, match=YES
+[COMPUTE DEBUG] iter=0 tid=0: PTX=0.000000, manual=0.000000, scale0=0.000000, scale1=0.000000, match=YES
+[COMPUTE DEBUG] iter=0 tid=0: PTX=264.000000, manual=264.000000, scale0=0.000000, scale1=6.000000, match=YES
+[COMPUTE DEBUG] iter=0 tid=0: PTX=-9.500000, manual=-9.500000, scale0=6.000000, scale1=4.000000, match=YES
+[COMPUTE DEBUG] iter=0 tid=0: PTX=72.000000, manual=72.000000, scale0=3.000000, scale1=0.000000, match=YES
+[COMPUTE DEBUG] iter=0 tid=0: PTX=-39.250000, manual=-39.250000, scale0=1.000000, scale1=0.000000, match=YES
+[COMPUTE DEBUG] iter=0 tid=0: PTX=40.500000, manual=40.500000, scale0=3.000000, scale1=0.000000, match=YES
+[COMPUTE DEBUG] iter=0 tid=0: PTX=5.250000, manual=5.250000, scale0=1.000000, scale1=0.000000, match=YES
+[COMPUTE DEBUG] iter=0 tid=0: PTX=46.750000, manual=46.750000, scale0=0.000000, scale1=1.000000, match=YES
+[COMPUTE DEBUG] iter=0 tid=0: PTX=-301.500000, manual=-301.500000, scale0=0.000000, scale1=3.000000, match=YES
+[COMPUTE DEBUG] iter=0 tid=0: PTX=-87.750000, manual=-87.750000, scale0=1.000000, scale1=9.000000, match=YES
+[COMPUTE DEBUG] iter=0 tid=0: PTX=0.000000, manual=0.000000, scale0=0.000000, scale1=0.000000, match=YES
+[COMPUTE DEBUG] iter=0 tid=0: PTX=13.000000, manual=13.000000, scale0=3.000000, scale1=4.000000, match=YES
+[COMPUTE DEBUG] iter=0 tid=0: PTX=-52.500000, manual=-52.500000, scale0=3.000000, scale1=0.000000, match=YES
+[COMPUTE DEBUG] iter=0 tid=0: PTX=240.750000, manual=240.750000, scale0=9.000000, scale1=0.000000, match=YES
+[COMPUTE DEBUG] iter=0 tid=0: PTX=0.000000, manual=0.000000, scale0=0.000000, scale1=0.000000, match=YES
+[COMPUTE DEBUG] iter=0 tid=0: PTX=484.500000, manual=484.500000, scale0=9.000000, scale1=6.000000, match=YES
+[COMPUTE DEBUG] iter=0 tid=0: PTX=-27.000000, manual=-27.000000, scale0=3.000000, scale1=0.000000, match=YES
+[COMPUTE DEBUG] iter=0 tid=0: PTX=28.500000, manual=28.500000, scale0=6.000000, scale1=2.000000, match=YES
+[COMPUTE DEBUG] iter=0 tid=0: PTX=0.000000, manual=0.000000, scale0=0.000000, scale1=0.000000, match=YES
+[COMPUTE DEBUG] iter=0 tid=0: PTX=-72.250000, manual=-72.250000, scale0=1.000000, scale1=1.000000, match=YES
+[COMPUTE DEBUG] iter=0 tid=0: PTX=-112.000000, manual=-112.000000, scale0=3.000000, scale1=2.000000, match=YES
+[COMPUTE DEBUG] iter=0 tid=0: PTX=-79.000000, manual=-79.000000, scale0=2.000000, scale1=1.000000, match=YES
+[COMPUTE DEBUG] iter=0 tid=0: PTX=219.250000, manual=219.250000, scale0=2.000000, scale1=3.000000, match=YES
+[COMPUTE DEBUG] iter=0 tid=0: PTX=-309.750000, manual=-309.750000, scale0=9.000000, scale1=6.000000, match=YES
+[COMPUTE DEBUG] iter=0 tid=0: PTX=0.000000, manual=0.000000, scale0=0.000000, scale1=0.000000, match=YES
+[COMPUTE DEBUG] iter=0 tid=0: PTX=110.250000, manual=110.250000, scale0=6.000000, scale1=1.000000, match=YES
+[COMPUTE DEBUG] iter=0 tid=0: PTX=110.000000, manual=110.000000, scale0=2.000000, scale1=0.000000, match=YES
+[COMPUTE DEBUG] iter=0 tid=0: PTX=0.000000, manual=0.000000, scale0=0.000000, scale1=0.000000, match=YES
+[COMPUTE DEBUG] iter=0 tid=0: PTX=92.250000, manual=92.250000, scale0=0.000000, scale1=9.000000, match=YES
+[COMPUTE DEBUG] iter=0 tid=0: PTX=298.500000, manual=298.500000, scale0=0.000000, scale1=6.000000, match=YES
+[COMPUTE DEBUG] iter=0 tid=0: PTX=420.750000, manual=420.750000, scale0=9.000000, scale1=0.000000, match=YES
+[COMPUTE DEBUG] iter=0 tid=0: PTX=-434.250000, manual=-434.250000, scale0=9.000000, scale1=0.000000, match=YES
+[COMPUTE DEBUG] iter=0 tid=0: PTX=-50.000000, manual=-50.000000, scale0=0.000000, scale1=2.000000, match=YES
+[COMPUTE DEBUG] iter=0 tid=0: PTX=29.500000, manual=29.500000, scale0=1.000000, scale1=1.000000, match=YES
+[COMPUTE DEBUG] iter=0 tid=0: PTX=0.000000, manual=0.000000, scale0=0.000000, scale1=0.000000, match=YES
+[COMPUTE DEBUG] iter=0 tid=0: PTX=-67.500000, manual=-67.500000, scale0=3.000000, scale1=0.000000, match=YES
+[COMPUTE DEBUG] iter=0 tid=0: PTX=84.500000, manual=84.500000, scale0=0.000000, scale1=1.000000, match=YES
+[COMPUTE DEBUG] iter=0 tid=0: PTX=21.750000, manual=21.750000, scale0=0.000000, scale1=3.000000, match=YES
+[COMPUTE DEBUG] iter=0 tid=0: PTX=0.000000, manual=0.000000, scale0=0.000000, scale1=0.000000, match=YES
+[COMPUTE DEBUG] iter=0 tid=0: PTX=42.500000, manual=42.500000, scale0=0.000000, scale1=2.000000, match=YES
+[COMPUTE DEBUG] iter=0 tid=0: PTX=0.000000, manual=0.000000, scale0=0.000000, scale1=0.000000, match=YES
+[COMPUTE DEBUG] iter=0 tid=0: PTX=-19.500000, manual=-19.500000, scale0=6.000000, scale1=0.000000, match=YES
+[COMPUTE DEBUG] iter=0 tid=0: PTX=37.500000, manual=37.500000, scale0=6.000000, scale1=0.000000, match=YES
+[COMPUTE DEBUG] iter=0 tid=0: PTX=22.000000, manual=22.000000, scale0=2.000000, scale1=0.000000, match=YES
+[COMPUTE DEBUG] iter=0 tid=0: PTX=0.000000, manual=0.000000, scale0=0.000000, scale1=0.000000, match=YES
+[COMPUTE DEBUG] iter=0 tid=0: PTX=0.000000, manual=0.000000, scale0=0.000000, scale1=0.000000, match=YES
+[COMPUTE DEBUG] iter=0 tid=0: PTX=-31.500000, manual=-31.500000, scale0=3.000000, scale1=0.000000, match=YES
+[COMPUTE DEBUG] iter=0 tid=0: PTX=15.000000, manual=15.000000, scale0=3.000000, scale1=0.000000, match=YES
+[COMPUTE DEBUG] iter=0 tid=0: PTX=-141.000000, manual=-141.000000, scale0=3.000000, scale1=0.000000, match=YES
+[COMPUTE DEBUG] iter=0 tid=0: PTX=336.000000, manual=336.000000, scale0=0.000000, scale1=6.000000, match=YES
+[COMPUTE DEBUG] iter=0 tid=0: PTX=35.500000, manual=35.500000, scale0=2.000000, scale1=0.000000, match=YES
+[COMPUTE DEBUG] iter=0 tid=0: PTX=264.000000, manual=264.000000, scale0=0.000000, scale1=6.000000, match=YES
+[COMPUTE DEBUG] iter=0 tid=0: PTX=46.000000, manual=46.000000, scale0=0.000000, scale1=4.000000, match=YES
+[COMPUTE DEBUG] iter=0 tid=0: PTX=-3.000000, manual=-3.000000, scale0=0.000000, scale1=6.000000, match=YES
+[COMPUTE DEBUG] iter=0 tid=0: PTX=-157.000000, manual=-157.000000, scale0=4.000000, scale1=0.000000, match=YES
+[COMPUTE DEBUG] iter=0 tid=0: PTX=40.500000, manual=40.500000, scale0=3.000000, scale1=0.000000, match=YES
+[COMPUTE DEBUG] iter=0 tid=0: PTX=46.500000, manual=46.500000, scale0=6.000000, scale1=6.000000, match=YES
+[COMPUTE DEBUG] iter=0 tid=0: PTX=-198.000000, manual=-198.000000, scale0=6.000000, scale1=0.000000, match=YES
+[COMPUTE DEBUG] iter=0 tid=0: PTX=0.000000, manual=0.000000, scale0=0.000000, scale1=0.000000, match=YES
+[COMPUTE DEBUG] iter=0 tid=0: PTX=86.750000, manual=86.750000, scale0=3.000000, scale1=2.000000, match=YES
+[COMPUTE DEBUG] iter=0 tid=0: PTX=-48.000000, manual=-48.000000, scale0=3.000000, scale1=6.000000, match=YES
+[COMPUTE DEBUG] iter=0 tid=0: PTX=-64.500000, manual=-64.500000, scale0=0.000000, scale1=3.000000, match=YES
+[...] 50 lines omitted```"
