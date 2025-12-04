@@ -1,5 +1,5 @@
 "**NVIDIA on GitHub ✅ success**
-> Workflow [19916556339](<https://github.com/gpu-mode/discord-cluster-manager/actions/runs/19916556339>) completed
+> Workflow [19916873609](<https://github.com/gpu-mode/discord-cluster-manager/actions/runs/19916873609>) completed
 > Downloading artifacts... done
 > ❌ Benchmarking failed
 
@@ -28,155 +28,232 @@ mismatch found! custom implementation doesn't match reference: Number of mismatc
 
 ## Program stdout:
 ```
-[COMPUTE DEBUG] iter=0 tid=0: PTX=-86.000000, manual=-86.000000, scale0=0.000000, scale1=4.000000, match=YES
-[COMPUTE DEBUG] iter=0 tid=0: PTX=-62.000000, manual=-62.000000, scale0=6.000000, scale1=4.000000, match=YES
-[COMPUTE DEBUG] iter=0 tid=0: PTX=53.500000, manual=53.500000, scale0=2.000000, scale1=0.000000, match=YES
-[COMPUTE DEBUG] iter=0 tid=0: PTX=-280.000000, manual=-280.000000, scale0=6.000000, scale1=2.000000, match=YES
-[COMPUTE DEBUG] iter=0 tid=0: PTX=108.000000, manual=108.000000, scale0=3.000000, scale1=0.000000, match=YES
-[COMPUTE DEBUG] iter=0 tid=0: PTX=0.000000, manual=0.000000, scale0=0.000000, scale1=0.000000, match=YES
-[COMPUTE DEBUG] iter=0 tid=0: PTX=-107.500000, manual=-107.500000, scale0=4.000000, scale1=9.000000, match=YES
-[COMPUTE DEBUG] iter=0 tid=0: PTX=-97.500000, manual=-97.500000, scale0=2.000000, scale1=0.000000, match=YES
-[COMPUTE DEBUG] iter=0 tid=0: PTX=-391.500000, manual=-391.500000, scale0=4.000000, scale1=9.000000, match=YES
-[COMPUTE DEBUG] iter=0 tid=0: PTX=-20.500000, manual=-20.500000, scale0=0.000000, scale1=2.000000, match=YES
-[COMPUTE DEBUG] iter=0 tid=0: PTX=0.000000, manual=0.000000, scale0=0.000000, scale1=0.000000, match=YES
-[COMPUTE DEBUG] iter=0 tid=0: PTX=0.000000, manual=0.000000, scale0=0.000000, scale1=0.000000, match=YES
-[COMPUTE DEBUG] iter=0 tid=0: PTX=-57.250000, manual=-57.250000, scale0=2.000000, scale1=1.000000, match=YES
-[COMPUTE DEBUG] iter=0 tid=0: PTX=0.000000, manual=0.000000, scale0=2.000000, scale1=6.000000, match=YES
-[COMPUTE DEBUG] iter=0 tid=0: PTX=204.000000, manual=204.000000, scale0=1.000000, scale1=2.000000, match=YES
-[COMPUTE DEBUG] iter=0 tid=0: PTX=0.000000, manual=0.000000, scale0=0.000000, scale1=0.000000, match=YES
-[COMPUTE DEBUG] iter=0 tid=0: PTX=0.000000, manual=0.000000, scale0=0.000000, scale1=0.000000, match=YES
-[COMPUTE DEBUG] iter=0 tid=0: PTX=-123.000000, manual=-123.000000, scale0=3.000000, scale1=0.000000, match=YES
-[COMPUTE DEBUG] iter=0 tid=0: PTX=0.000000, manual=0.000000, scale0=0.000000, scale1=0.000000, match=YES
-[COMPUTE DEBUG] iter=0 tid=0: PTX=220.500000, manual=220.500000, scale0=6.000000, scale1=4.000000, match=YES
-[COMPUTE DEBUG] iter=0 tid=0: PTX=-145.500000, manual=-145.500000, scale0=2.000000, scale1=2.000000, match=YES
-[COMPUTE DEBUG] iter=0 tid=0: PTX=-535.500000, manual=-535.500000, scale0=9.000000, scale1=0.000000, match=YES
-[COMPUTE DEBUG] iter=0 tid=0: PTX=705.000000, manual=705.500000, scale0=9.000000, scale1=1.000000, match=NO
-[COMPUTE DEBUG] iter=0 tid=0: PTX=54.000000, manual=54.000000, scale0=6.000000, scale1=0.000000, match=YES
-[COMPUTE DEBUG] iter=0 tid=0: PTX=36.750000, manual=36.750000, scale0=0.000000, scale1=1.000000, match=YES
-[COMPUTE DEBUG] iter=0 tid=0: PTX=169.000000, manual=169.000000, scale0=0.000000, scale1=2.000000, match=YES
-[COMPUTE DEBUG] iter=0 tid=0: PTX=76.000000, manual=76.000000, scale0=4.000000, scale1=4.000000, match=YES
-[COMPUTE DEBUG] iter=0 tid=0: PTX=0.000000, manual=0.000000, scale0=0.000000, scale1=0.000000, match=YES
-[COMPUTE DEBUG] iter=0 tid=0: PTX=127.500000, manual=127.500000, scale0=0.000000, scale1=6.000000, match=YES
-[COMPUTE DEBUG] iter=0 tid=0: PTX=0.000000, manual=0.000000, scale0=0.000000, scale1=0.000000, match=YES
-[COMPUTE DEBUG] iter=0 tid=0: PTX=0.000000, manual=0.000000, scale0=0.000000, scale1=0.000000, match=YES
-[COMPUTE DEBUG] iter=0 tid=0: PTX=12.500000, manual=12.500000, scale0=2.000000, scale1=0.000000, match=YES
-[COMPUTE DEBUG] iter=0 tid=0: PTX=33.000000, manual=33.000000, scale0=3.000000, scale1=0.000000, match=YES
-[COMPUTE DEBUG] iter=0 tid=0: PTX=139.000000, manual=139.000000, scale0=0.000000, scale1=2.000000, match=YES
-[COMPUTE DEBUG] iter=0 tid=0: PTX=0.000000, manual=0.000000, scale0=0.000000, scale1=0.000000, match=YES
-[COMPUTE DEBUG] iter=0 tid=0: PTX=-33.500000, manual=-33.500000, scale0=6.000000, scale1=2.000000, match=YES
-[COMPUTE DEBUG] iter=0 tid=0: PTX=-299.000000, manual=-299.000000, scale0=2.000000, scale1=6.000000, match=YES
-[COMPUTE DEBUG] iter=0 tid=0: PTX=253.500000, manual=253.500000, scale0=0.000000, scale1=6.000000, match=YES
-[COMPUTE DEBUG] iter=0 tid=0: PTX=168.000000, manual=168.000000, scale0=0.000000, scale1=3.000000, match=YES
-[COMPUTE DEBUG] iter=0 tid=0: PTX=0.000000, manual=0.000000, scale0=0.000000, scale1=0.000000, match=YES
-[COMPUTE DEBUG] iter=0 tid=0: PTX=264.000000, manual=264.000000, scale0=0.000000, scale1=6.000000, match=YES
-[COMPUTE DEBUG] iter=0 tid=0: PTX=-9.500000, manual=-9.500000, scale0=6.000000, scale1=4.000000, match=YES
-[COMPUTE DEBUG] iter=0 tid=0: PTX=72.000000, manual=72.000000, scale0=3.000000, scale1=0.000000, match=YES
-[COMPUTE DEBUG] iter=0 tid=0: PTX=-39.250000, manual=-39.250000, scale0=1.000000, scale1=0.000000, match=YES
-[COMPUTE DEBUG] iter=0 tid=0: PTX=40.500000, manual=40.500000, scale0=3.000000, scale1=0.000000, match=YES
-[COMPUTE DEBUG] iter=0 tid=0: PTX=5.250000, manual=5.250000, scale0=1.000000, scale1=0.000000, match=YES
-[COMPUTE DEBUG] iter=0 tid=0: PTX=46.750000, manual=46.750000, scale0=0.000000, scale1=1.000000, match=YES
-[COMPUTE DEBUG] iter=0 tid=0: PTX=-301.500000, manual=-301.500000, scale0=0.000000, scale1=3.000000, match=YES
-[COMPUTE DEBUG] iter=0 tid=0: PTX=-87.750000, manual=-87.750000, scale0=1.000000, scale1=9.000000, match=YES
-[COMPUTE DEBUG] iter=0 tid=0: PTX=0.000000, manual=0.000000, scale0=0.000000, scale1=0.000000, match=YES
-[COMPUTE DEBUG] iter=0 tid=0: PTX=-86.000000, manual=-86.000000, scale0=0.000000, scale1=4.000000, match=YES
-[COMPUTE DEBUG] iter=0 tid=0: PTX=-62.000000, manual=-62.000000, scale0=6.000000, scale1=4.000000, match=YES
-[COMPUTE DEBUG] iter=0 tid=0: PTX=53.500000, manual=53.500000, scale0=2.000000, scale1=0.000000, match=YES
-[COMPUTE DEBUG] iter=0 tid=0: PTX=-280.000000, manual=-280.000000, scale0=6.000000, scale1=2.000000, match=YES
-[COMPUTE DEBUG] iter=0 tid=0: PTX=108.000000, manual=108.000000, scale0=3.000000, scale1=0.000000, match=YES
-[COMPUTE DEBUG] iter=0 tid=0: PTX=0.000000, manual=0.000000, scale0=0.000000, scale1=0.000000, match=YES
-[COMPUTE DEBUG] iter=0 tid=0: PTX=-107.500000, manual=-107.500000, scale0=4.000000, scale1=9.000000, match=YES
-[COMPUTE DEBUG] iter=0 tid=0: PTX=-97.500000, manual=-97.500000, scale0=2.000000, scale1=0.000000, match=YES
-[COMPUTE DEBUG] iter=0 tid=0: PTX=-391.500000, manual=-391.500000, scale0=4.000000, scale1=9.000000, match=YES
-[COMPUTE DEBUG] iter=0 tid=0: PTX=-20.500000, manual=-20.500000, scale0=0.000000, scale1=2.000000, match=YES
-[COMPUTE DEBUG] iter=0 tid=0: PTX=0.000000, manual=0.000000, scale0=0.000000, scale1=0.000000, match=YES
-[COMPUTE DEBUG] iter=0 tid=0: PTX=0.000000, manual=0.000000, scale0=0.000000, scale1=0.000000, match=YES
-[COMPUTE DEBUG] iter=0 tid=0: PTX=-57.250000, manual=-57.250000, scale0=2.000000, scale1=1.000000, match=YES
-[COMPUTE DEBUG] iter=0 tid=0: PTX=0.000000, manual=0.000000, scale0=2.000000, scale1=6.000000, match=YES
-[COMPUTE DEBUG] iter=0 tid=0: PTX=204.000000, manual=204.000000, scale0=1.000000, scale1=2.000000, match=YES
-[COMPUTE DEBUG] iter=0 tid=0: PTX=0.000000, manual=0.000000, scale0=0.000000, scale1=0.000000, match=YES
-[COMPUTE DEBUG] iter=0 tid=0: PTX=0.000000, manual=0.000000, scale0=0.000000, scale1=0.000000, match=YES
-[COMPUTE DEBUG] iter=0 tid=0: PTX=-123.000000, manual=-123.000000, scale0=3.000000, scale1=0.000000, match=YES
-[COMPUTE DEBUG] iter=0 tid=0: PTX=0.000000, manual=0.000000, scale0=0.000000, scale1=0.000000, match=YES
-[COMPUTE DEBUG] iter=0 tid=0: PTX=220.500000, manual=220.500000, scale0=6.000000, scale1=4.000000, match=YES
-[COMPUTE DEBUG] iter=0 tid=0: PTX=-145.500000, manual=-145.500000, scale0=2.000000, scale1=2.000000, match=YES
-[COMPUTE DEBUG] iter=0 tid=0: PTX=-535.500000, manual=-535.500000, scale0=9.000000, scale1=0.000000, match=YES
-[COMPUTE DEBUG] iter=0 tid=0: PTX=705.000000, manual=705.500000, scale0=9.000000, scale1=1.000000, match=NO
-[COMPUTE DEBUG] iter=0 tid=0: PTX=54.000000, manual=54.000000, scale0=6.000000, scale1=0.000000, match=YES
-[COMPUTE DEBUG] iter=0 tid=0: PTX=36.750000, manual=36.750000, scale0=0.000000, scale1=1.000000, match=YES
-[COMPUTE DEBUG] iter=0 tid=0: PTX=169.000000, manual=169.000000, scale0=0.000000, scale1=2.000000, match=YES
-[COMPUTE DEBUG] iter=0 tid=0: PTX=76.000000, manual=76.000000, scale0=4.000000, scale1=4.000000, match=YES
-[COMPUTE DEBUG] iter=0 tid=0: PTX=0.000000, manual=0.000000, scale0=0.000000, scale1=0.000000, match=YES
-[COMPUTE DEBUG] iter=0 tid=0: PTX=127.500000, manual=127.500000, scale0=0.000000, scale1=6.000000, match=YES
-[COMPUTE DEBUG] iter=0 tid=0: PTX=0.000000, manual=0.000000, scale0=0.000000, scale1=0.000000, match=YES
-[COMPUTE DEBUG] iter=0 tid=0: PTX=0.000000, manual=0.000000, scale0=0.000000, scale1=0.000000, match=YES
-[COMPUTE DEBUG] iter=0 tid=0: PTX=12.500000, manual=12.500000, scale0=2.000000, scale1=0.000000, match=YES
-[COMPUTE DEBUG] iter=0 tid=0: PTX=33.000000, manual=33.000000, scale0=3.000000, scale1=0.000000, match=YES
-[COMPUTE DEBUG] iter=0 tid=0: PTX=139.000000, manual=139.000000, scale0=0.000000, scale1=2.000000, match=YES
-[COMPUTE DEBUG] iter=0 tid=0: PTX=0.000000, manual=0.000000, scale0=0.000000, scale1=0.000000, match=YES
-[COMPUTE DEBUG] iter=0 tid=0: PTX=-33.500000, manual=-33.500000, scale0=6.000000, scale1=2.000000, match=YES
-[COMPUTE DEBUG] iter=0 tid=0: PTX=-299.000000, manual=-299.000000, scale0=2.000000, scale1=6.000000, match=YES
-[COMPUTE DEBUG] iter=0 tid=0: PTX=253.500000, manual=253.500000, scale0=0.000000, scale1=6.000000, match=YES
-[COMPUTE DEBUG] iter=0 tid=0: PTX=168.000000, manual=168.000000, scale0=0.000000, scale1=3.000000, match=YES
-[COMPUTE DEBUG] iter=0 tid=0: PTX=0.000000, manual=0.000000, scale0=0.000000, scale1=0.000000, match=YES
-[COMPUTE DEBUG] iter=0 tid=0: PTX=264.000000, manual=264.000000, scale0=0.000000, scale1=6.000000, match=YES
-[COMPUTE DEBUG] iter=0 tid=0: PTX=-9.500000, manual=-9.500000, scale0=6.000000, scale1=4.000000, match=YES
-[COMPUTE DEBUG] iter=0 tid=0: PTX=72.000000, manual=72.000000, scale0=3.000000, scale1=0.000000, match=YES
-[COMPUTE DEBUG] iter=0 tid=0: PTX=-39.250000, manual=-39.250000, scale0=1.000000, scale1=0.000000, match=YES
-[COMPUTE DEBUG] iter=0 tid=0: PTX=40.500000, manual=40.500000, scale0=3.000000, scale1=0.000000, match=YES
-[COMPUTE DEBUG] iter=0 tid=0: PTX=5.250000, manual=5.250000, scale0=1.000000, scale1=0.000000, match=YES
-[COMPUTE DEBUG] iter=0 tid=0: PTX=46.750000, manual=46.750000, scale0=0.000000, scale1=1.000000, match=YES
-[COMPUTE DEBUG] iter=0 tid=0: PTX=-301.500000, manual=-301.500000, scale0=0.000000, scale1=3.000000, match=YES
-[COMPUTE DEBUG] iter=0 tid=0: PTX=-87.750000, manual=-87.750000, scale0=1.000000, scale1=9.000000, match=YES
-[COMPUTE DEBUG] iter=0 tid=0: PTX=0.000000, manual=0.000000, scale0=0.000000, scale1=0.000000, match=YES
-[COMPUTE DEBUG] iter=0 tid=0: PTX=13.000000, manual=13.000000, scale0=3.000000, scale1=4.000000, match=YES
-[COMPUTE DEBUG] iter=0 tid=0: PTX=-52.500000, manual=-52.500000, scale0=3.000000, scale1=0.000000, match=YES
-[COMPUTE DEBUG] iter=0 tid=0: PTX=240.750000, manual=240.750000, scale0=9.000000, scale1=0.000000, match=YES
-[COMPUTE DEBUG] iter=0 tid=0: PTX=0.000000, manual=0.000000, scale0=0.000000, scale1=0.000000, match=YES
-[COMPUTE DEBUG] iter=0 tid=0: PTX=484.500000, manual=484.500000, scale0=9.000000, scale1=6.000000, match=YES
-[COMPUTE DEBUG] iter=0 tid=0: PTX=-27.000000, manual=-27.000000, scale0=3.000000, scale1=0.000000, match=YES
-[COMPUTE DEBUG] iter=0 tid=0: PTX=28.500000, manual=28.500000, scale0=6.000000, scale1=2.000000, match=YES
-[COMPUTE DEBUG] iter=0 tid=0: PTX=0.000000, manual=0.000000, scale0=0.000000, scale1=0.000000, match=YES
-[COMPUTE DEBUG] iter=0 tid=0: PTX=-72.250000, manual=-72.250000, scale0=1.000000, scale1=1.000000, match=YES
-[COMPUTE DEBUG] iter=0 tid=0: PTX=-112.000000, manual=-112.000000, scale0=3.000000, scale1=2.000000, match=YES
-[COMPUTE DEBUG] iter=0 tid=0: PTX=-79.000000, manual=-79.000000, scale0=2.000000, scale1=1.000000, match=YES
-[COMPUTE DEBUG] iter=0 tid=0: PTX=219.250000, manual=219.250000, scale0=2.000000, scale1=3.000000, match=YES
-[COMPUTE DEBUG] iter=0 tid=0: PTX=-309.750000, manual=-309.750000, scale0=9.000000, scale1=6.000000, match=YES
-[COMPUTE DEBUG] iter=0 tid=0: PTX=0.000000, manual=0.000000, scale0=0.000000, scale1=0.000000, match=YES
-[COMPUTE DEBUG] iter=0 tid=0: PTX=110.250000, manual=110.250000, scale0=6.000000, scale1=1.000000, match=YES
-[COMPUTE DEBUG] iter=0 tid=0: PTX=110.000000, manual=110.000000, scale0=2.000000, scale1=0.000000, match=YES
-[COMPUTE DEBUG] iter=0 tid=0: PTX=0.000000, manual=0.000000, scale0=0.000000, scale1=0.000000, match=YES
-[COMPUTE DEBUG] iter=0 tid=0: PTX=92.250000, manual=92.250000, scale0=0.000000, scale1=9.000000, match=YES
-[COMPUTE DEBUG] iter=0 tid=0: PTX=298.500000, manual=298.500000, scale0=0.000000, scale1=6.000000, match=YES
-[COMPUTE DEBUG] iter=0 tid=0: PTX=420.750000, manual=420.750000, scale0=9.000000, scale1=0.000000, match=YES
-[COMPUTE DEBUG] iter=0 tid=0: PTX=-434.250000, manual=-434.250000, scale0=9.000000, scale1=0.000000, match=YES
-[COMPUTE DEBUG] iter=0 tid=0: PTX=-50.000000, manual=-50.000000, scale0=0.000000, scale1=2.000000, match=YES
-[COMPUTE DEBUG] iter=0 tid=0: PTX=29.500000, manual=29.500000, scale0=1.000000, scale1=1.000000, match=YES
-[COMPUTE DEBUG] iter=0 tid=0: PTX=0.000000, manual=0.000000, scale0=0.000000, scale1=0.000000, match=YES
-[COMPUTE DEBUG] iter=0 tid=0: PTX=-67.500000, manual=-67.500000, scale0=3.000000, scale1=0.000000, match=YES
-[COMPUTE DEBUG] iter=0 tid=0: PTX=84.500000, manual=84.500000, scale0=0.000000, scale1=1.000000, match=YES
-[COMPUTE DEBUG] iter=0 tid=0: PTX=21.750000, manual=21.750000, scale0=0.000000, scale1=3.000000, match=YES
-[COMPUTE DEBUG] iter=0 tid=0: PTX=0.000000, manual=0.000000, scale0=0.000000, scale1=0.000000, match=YES
-[COMPUTE DEBUG] iter=0 tid=0: PTX=42.500000, manual=42.500000, scale0=0.000000, scale1=2.000000, match=YES
-[COMPUTE DEBUG] iter=0 tid=0: PTX=0.000000, manual=0.000000, scale0=0.000000, scale1=0.000000, match=YES
-[COMPUTE DEBUG] iter=0 tid=0: PTX=-19.500000, manual=-19.500000, scale0=6.000000, scale1=0.000000, match=YES
-[COMPUTE DEBUG] iter=0 tid=0: PTX=37.500000, manual=37.500000, scale0=6.000000, scale1=0.000000, match=YES
-[COMPUTE DEBUG] iter=0 tid=0: PTX=22.000000, manual=22.000000, scale0=2.000000, scale1=0.000000, match=YES
-[COMPUTE DEBUG] iter=0 tid=0: PTX=0.000000, manual=0.000000, scale0=0.000000, scale1=0.000000, match=YES
-[COMPUTE DEBUG] iter=0 tid=0: PTX=0.000000, manual=0.000000, scale0=0.000000, scale1=0.000000, match=YES
-[COMPUTE DEBUG] iter=0 tid=0: PTX=-31.500000, manual=-31.500000, scale0=3.000000, scale1=0.000000, match=YES
-[COMPUTE DEBUG] iter=0 tid=0: PTX=15.000000, manual=15.000000, scale0=3.000000, scale1=0.000000, match=YES
-[COMPUTE DEBUG] iter=0 tid=0: PTX=-141.000000, manual=-141.000000, scale0=3.000000, scale1=0.000000, match=YES
-[COMPUTE DEBUG] iter=0 tid=0: PTX=336.000000, manual=336.000000, scale0=0.000000, scale1=6.000000, match=YES
-[COMPUTE DEBUG] iter=0 tid=0: PTX=35.500000, manual=35.500000, scale0=2.000000, scale1=0.000000, match=YES
-[COMPUTE DEBUG] iter=0 tid=0: PTX=264.000000, manual=264.000000, scale0=0.000000, scale1=6.000000, match=YES
-[COMPUTE DEBUG] iter=0 tid=0: PTX=46.000000, manual=46.000000, scale0=0.000000, scale1=4.000000, match=YES
-[COMPUTE DEBUG] iter=0 tid=0: PTX=-3.000000, manual=-3.000000, scale0=0.000000, scale1=6.000000, match=YES
-[COMPUTE DEBUG] iter=0 tid=0: PTX=-157.000000, manual=-157.000000, scale0=4.000000, scale1=0.000000, match=YES
-[COMPUTE DEBUG] iter=0 tid=0: PTX=40.500000, manual=40.500000, scale0=3.000000, scale1=0.000000, match=YES
-[COMPUTE DEBUG] iter=0 tid=0: PTX=46.500000, manual=46.500000, scale0=6.000000, scale1=6.000000, match=YES
-[COMPUTE DEBUG] iter=0 tid=0: PTX=-198.000000, manual=-198.000000, scale0=6.000000, scale1=0.000000, match=YES
-[COMPUTE DEBUG] iter=0 tid=0: PTX=0.000000, manual=0.000000, scale0=0.000000, scale1=0.000000, match=YES
-[COMPUTE DEBUG] iter=0 tid=0: PTX=86.750000, manual=86.750000, scale0=3.000000, scale1=2.000000, match=YES
-[COMPUTE DEBUG] iter=0 tid=0: PTX=-48.000000, manual=-48.000000, scale0=3.000000, scale1=6.000000, match=YES
-[COMPUTE DEBUG] iter=0 tid=0: PTX=-64.500000, manual=-64.500000, scale0=0.000000, scale1=3.000000, match=YES
-[...] 50 lines omitted```"
+[MISMATCH] iter=0 tid=60: PTX=432.250000, manual=432.000000, diff=0.250000
+[MISMATCH] iter=1 tid=51: PTX=-425.500000, manual=-425.250000, diff=-0.250000
+[MISMATCH] iter=5 tid=29: PTX=-544.000000, manual=-543.750000, diff=-0.250000
+[MISMATCH] iter=6 tid=95: PTX=-560.000000, manual=-559.750000, diff=-0.250000
+[MISMATCH] iter=7 tid=111: PTX=-810.000000, manual=-809.750000, diff=-0.250000
+[SUMMARY] total_checked=4096, mismatches=35
+[MISMATCH] iter=0 tid=102: PTX=-542.000000, manual=-541.500000, diff=-0.500000
+[MISMATCH] iter=4 tid=1: PTX=-1082.000000, manual=-1082.250000, diff=0.250000
+[MISMATCH] iter=1 tid=123: PTX=-706.000000, manual=-705.750000, diff=-0.250000
+[MISMATCH] iter=6 tid=50: PTX=-758.000000, manual=-758.250000, diff=0.250000
+[MISMATCH] iter=6 tid=57: PTX=-574.000000, manual=-573.750000, diff=-0.250000
+[SUMMARY] total_checked=4096, mismatches=28
+[MISMATCH] iter=0 tid=63: PTX=-524.000000, manual=-524.250000, diff=0.250000
+[MISMATCH] iter=0 tid=31: PTX=452.750000, manual=453.000000, diff=-0.250000
+[MISMATCH] iter=1 tid=11: PTX=-785.000000, manual=-785.250000, diff=0.250000
+[MISMATCH] iter=4 tid=73: PTX=-624.000000, manual=-623.750000, diff=-0.250000
+[MISMATCH] iter=6 tid=114: PTX=673.000000, manual=672.750000, diff=0.250000
+[SUMMARY] total_checked=4096, mismatches=29
+[MISMATCH] iter=0 tid=52: PTX=-844.000000, manual=-843.750000, diff=-0.250000
+[MISMATCH] iter=1 tid=85: PTX=-556.000000, manual=-556.250000, diff=0.250000
+[MISMATCH] iter=2 tid=105: PTX=-616.000000, manual=-615.750000, diff=-0.250000
+[MISMATCH] iter=4 tid=2: PTX=614.000000, manual=614.250000, diff=-0.250000
+[MISMATCH] iter=4 tid=41: PTX=175.000000, manual=175.250000, diff=-0.250000
+[SUMMARY] total_checked=4096, mismatches=33
+[MISMATCH] iter=2 tid=124: PTX=618.000000, manual=618.500000, diff=-0.500000
+[MISMATCH] iter=2 tid=28: PTX=527.000000, manual=527.250000, diff=-0.250000
+[MISMATCH] iter=3 tid=36: PTX=-312.000000, manual=-311.750000, diff=-0.250000
+[MISMATCH] iter=3 tid=58: PTX=-520.000000, manual=-519.750000, diff=-0.250000
+[MISMATCH] iter=5 tid=65: PTX=740.000000, manual=740.250000, diff=-0.250000
+[SUMMARY] total_checked=4096, mismatches=33
+[MISMATCH] iter=1 tid=108: PTX=524.000000, manual=524.250000, diff=-0.250000
+[MISMATCH] iter=1 tid=60: PTX=634.000000, manual=633.750000, diff=0.250000
+[MISMATCH] iter=2 tid=7: PTX=-542.000000, manual=-542.250000, diff=0.250000
+[MISMATCH] iter=4 tid=90: PTX=-1084.000000, manual=-1083.750000, diff=-0.250000
+[MISMATCH] iter=4 tid=45: PTX=-661.000000, manual=-660.750000, diff=-0.250000
+[SUMMARY] total_checked=4096, mismatches=30
+[MISMATCH] iter=0 tid=78: PTX=-917.000000, manual=-916.750000, diff=-0.250000
+[MISMATCH] iter=1 tid=3: PTX=1157.000000, manual=1157.250000, diff=-0.250000
+[MISMATCH] iter=1 tid=106: PTX=-740.000000, manual=-740.250000, diff=0.250000
+[MISMATCH] iter=4 tid=36: PTX=706.000000, manual=705.750000, diff=0.250000
+[MISMATCH] iter=2 tid=30: PTX=570.000000, manual=569.750000, diff=0.250000
+[SUMMARY] total_checked=4096, mismatches=28
+[MISMATCH] iter=4 tid=36: PTX=578.000000, manual=578.250000, diff=-0.250000
+[MISMATCH] iter=6 tid=119: PTX=-682.000000, manual=-681.750000, diff=-0.250000
+[MISMATCH] iter=8 tid=87: PTX=-575.000000, manual=-575.250000, diff=0.250000
+[MISMATCH] iter=7 tid=51: PTX=-517.000000, manual=-516.750000, diff=-0.250000
+[SUMMARY] total_checked=4096, mismatches=17
+[MISMATCH] iter=0 tid=84: PTX=489.500000, manual=489.750000, diff=-0.250000
+[MISMATCH] iter=0 tid=22: PTX=-685.000000, manual=-684.750000, diff=-0.250000
+[MISMATCH] iter=1 tid=125: PTX=-709.000000, manual=-708.750000, diff=-0.250000
+[MISMATCH] iter=2 tid=41: PTX=712.000000, manual=711.750000, diff=0.250000
+[MISMATCH] iter=1 tid=91: PTX=-521.000000, manual=-521.250000, diff=0.250000
+[SUMMARY] total_checked=4096, mismatches=26
+[MISMATCH] iter=0 tid=37: PTX=-668.000000, manual=-667.750000, diff=-0.250000
+[MISMATCH] iter=2 tid=15: PTX=878.500000, manual=878.250000, diff=0.250000
+[MISMATCH] iter=2 tid=20: PTX=-652.000000, manual=-652.250000, diff=0.250000
+[MISMATCH] iter=3 tid=98: PTX=600.500000, manual=600.750000, diff=-0.250000
+[MISMATCH] iter=3 tid=107: PTX=-292.750000, manual=-292.500000, diff=-0.250000
+[SUMMARY] total_checked=4096, mismatches=35
+[MISMATCH] iter=1 tid=120: PTX=555.500000, manual=555.750000, diff=-0.250000
+[MISMATCH] iter=5 tid=48: PTX=-583.000000, manual=-582.750000, diff=-0.250000
+[MISMATCH] iter=5 tid=49: PTX=1316.000000, manual=1315.500000, diff=0.500000
+[MISMATCH] iter=3 tid=122: PTX=-448.000000, manual=-447.750000, diff=-0.250000
+[MISMATCH] iter=8 tid=17: PTX=-632.000000, manual=-632.250000, diff=0.250000
+[SUMMARY] total_checked=4096, mismatches=33
+[MISMATCH] iter=2 tid=114: PTX=899.000000, manual=899.250000, diff=-0.250000
+[MISMATCH] iter=3 tid=15: PTX=-699.500000, manual=-699.750000, diff=0.250000
+[MISMATCH] iter=4 tid=36: PTX=-587.000000, manual=-587.250000, diff=0.250000
+[MISMATCH] iter=6 tid=66: PTX=641.000000, manual=641.250000, diff=-0.250000
+[MISMATCH] iter=5 tid=126: PTX=668.000000, manual=668.250000, diff=-0.250000
+[SUMMARY] total_checked=4096, mismatches=20
+[MISMATCH] iter=1 tid=93: PTX=809.000000, manual=809.250000, diff=-0.250000
+[MISMATCH] iter=3 tid=33: PTX=682.000000, manual=681.750000, diff=0.250000
+[MISMATCH] iter=3 tid=113: PTX=610.000000, manual=609.750000, diff=0.250000
+[MISMATCH] iter=4 tid=5: PTX=853.000000, manual=852.750000, diff=0.250000
+[MISMATCH] iter=2 tid=81: PTX=1028.000000, manual=1027.500000, diff=0.500000
+[SUMMARY] total_checked=4096, mismatches=35
+[MISMATCH] iter=2 tid=17: PTX=1190.000000, manual=1190.250000, diff=-0.250000
+[MISMATCH] iter=2 tid=92: PTX=-43.500000, manual=-43.750000, diff=0.250000
+[MISMATCH] iter=3 tid=49: PTX=555.000000, manual=554.750000, diff=0.250000
+[MISMATCH] iter=3 tid=14: PTX=-686.000000, manual=-686.250000, diff=0.250000
+[MISMATCH] iter=6 tid=77: PTX=-745.000000, manual=-744.750000, diff=-0.250000
+[SUMMARY] total_checked=4096, mismatches=35
+[MISMATCH] iter=1 tid=103: PTX=965.000000, manual=965.250000, diff=-0.250000
+[MISMATCH] iter=1 tid=70: PTX=-596.000000, manual=-596.250000, diff=0.250000
+[MISMATCH] iter=1 tid=80: PTX=646.000000, manual=646.250000, diff=-0.250000
+[MISMATCH] iter=1 tid=85: PTX=629.000000, manual=629.250000, diff=-0.250000
+[MISMATCH] iter=1 tid=58: PTX=-584.000000, manual=-584.250000, diff=0.250000
+[SUMMARY] total_checked=4096, mismatches=34
+[MISMATCH] iter=1 tid=90: PTX=550.000000, manual=549.750000, diff=0.250000
+[MISMATCH] iter=2 tid=10: PTX=-470.000000, manual=-470.250000, diff=0.250000
+[MISMATCH] iter=3 tid=8: PTX=-427.750000, manual=-427.500000, diff=-0.250000
+[MISMATCH] iter=7 tid=46: PTX=-596.000000, manual=-596.250000, diff=0.250000
+[MISMATCH] iter=8 tid=96: PTX=814.000000, manual=813.750000, diff=0.250000
+[SUMMARY] total_checked=4096, mismatches=24
+[MISMATCH] iter=2 tid=22: PTX=-556.000000, manual=-555.750000, diff=-0.250000
+[MISMATCH] iter=3 tid=123: PTX=782.000000, manual=782.250000, diff=-0.250000
+[MISMATCH] iter=6 tid=69: PTX=917.000000, manual=917.250000, diff=-0.250000
+[MISMATCH] iter=6 tid=63: PTX=-1328.000000, manual=-1327.500000, diff=-0.500000
+[MISMATCH] iter=6 tid=127: PTX=-630.500000, manual=-630.250000, diff=-0.250000
+[SUMMARY] total_checked=4096, mismatches=25
+[MISMATCH] iter=1 tid=123: PTX=-195.500000, manual=-195.750000, diff=0.250000
+[MISMATCH] iter=1 tid=59: PTX=-589.000000, manual=-588.750000, diff=-0.250000
+[MISMATCH] iter=1 tid=62: PTX=715.000000, manual=714.750000, diff=0.250000
+[MISMATCH] iter=4 tid=76: PTX=-1348.000000, manual=-1348.500000, diff=0.500000
+[MISMATCH] iter=4 tid=92: PTX=-826.000000, manual=-825.750000, diff=-0.250000
+[SUMMARY] total_checked=4096, mismatches=42
+[MISMATCH] iter=2 tid=73: PTX=563.000000, manual=562.750000, diff=0.250000
+[MISMATCH] iter=2 tid=100: PTX=-677.000000, manual=-677.250000, diff=0.250000
+[MISMATCH] iter=2 tid=106: PTX=709.000000, manual=708.750000, diff=0.250000
+[MISMATCH] iter=5 tid=13: PTX=673.000000, manual=672.750000, diff=0.250000
+[MISMATCH] iter=4 tid=115: PTX=-628.000000, manual=-627.750000, diff=-0.250000
+[SUMMARY] total_checked=4096, mismatches=33
+[MISMATCH] iter=0 tid=11: PTX=-514.000000, manual=-513.750000, diff=-0.250000
+[MISMATCH] iter=0 tid=14: PTX=-955.000000, manual=-954.750000, diff=-0.250000
+[MISMATCH] iter=1 tid=62: PTX=800.000000, manual=800.250000, diff=-0.250000
+[MISMATCH] iter=3 tid=49: PTX=380.500000, manual=380.250000, diff=0.250000
+[MISMATCH] iter=4 tid=19: PTX=453.500000, manual=453.250000, diff=0.250000
+[SUMMARY] total_checked=4096, mismatches=35
+[MISMATCH] iter=1 tid=73: PTX=-551.500000, manual=-551.250000, diff=-0.250000
+[MISMATCH] iter=1 tid=116: PTX=-667.000000, manual=-666.750000, diff=-0.250000
+[MISMATCH] iter=1 tid=59: PTX=943.000000, manual=943.250000, diff=-0.250000
+[MISMATCH] iter=3 tid=28: PTX=-556.000000, manual=-555.750000, diff=-0.250000
+[MISMATCH] iter=2 tid=122: PTX=-618.500000, manual=-618.750000, diff=0.250000
+[SUMMARY] total_checked=4096, mismatches=37
+[MISMATCH] iter=0 tid=95: PTX=560.000000, manual=560.250000, diff=-0.250000
+[MISMATCH] iter=1 tid=39: PTX=1036.000000, manual=1035.750000, diff=0.250000
+[MISMATCH] iter=1 tid=67: PTX=-515.000000, manual=-515.250000, diff=0.250000
+[MISMATCH] iter=6 tid=9: PTX=-691.000000, manual=-690.750000, diff=-0.250000
+[SUMMARY] total_checked=4096, mismatches=26
+[MISMATCH] iter=0 tid=0: PTX=705.000000, manual=705.500000, diff=-0.500000
+[MISMATCH] iter=1 tid=90: PTX=551.000000, manual=551.250000, diff=-0.250000
+[MISMATCH] iter=3 tid=98: PTX=518.000000, manual=518.250000, diff=-0.250000
+[MISMATCH] iter=3 tid=56: PTX=870.500000, manual=870.750000, diff=-0.250000
+[MISMATCH] iter=4 tid=121: PTX=-659.000000, manual=-659.250000, diff=0.250000
+[SUMMARY] total_checked=4096, mismatches=34
+[MISMATCH] iter=0 tid=65: PTX=314.000000, manual=313.750000, diff=0.250000
+[MISMATCH] iter=0 tid=108: PTX=-220.000000, manual=-220.500000, diff=0.500000
+[MISMATCH] iter=0 tid=28: PTX=610.000000, manual=609.750000, diff=0.250000
+[MISMATCH] iter=1 tid=0: PTX=-496.250000, manual=-496.500000, diff=0.250000
+[MISMATCH] iter=1 tid=21: PTX=-709.000000, manual=-708.750000, diff=-0.250000
+[SUMMARY] total_checked=4096, mismatches=35
+[MISMATCH] iter=0 tid=117: PTX=-665.000000, manual=-665.250000, diff=0.250000
+[MISMATCH] iter=0 tid=21: PTX=157.000000, manual=156.750000, diff=0.250000
+[MISMATCH] iter=2 tid=53: PTX=-526.000000, manual=-525.750000, diff=-0.250000
+[MISMATCH] iter=3 tid=71: PTX=772.000000, manual=771.750000, diff=0.250000
+[MISMATCH] iter=1 tid=98: PTX=643.000000, manual=643.500000, diff=-0.500000
+[SUMMARY] total_checked=4096, mismatches=39
+[MISMATCH] iter=1 tid=96: PTX=524.000000, manual=524.250000, diff=-0.250000
+[MISMATCH] iter=1 tid=45: PTX=601.000000, manual=600.750000, diff=0.250000
+[MISMATCH] iter=2 tid=79: PTX=595.000000, manual=594.750000, diff=0.250000
+[MISMATCH] iter=5 tid=17: PTX=605.000000, manual=605.250000, diff=-0.250000
+[MISMATCH] iter=4 tid=56: PTX=551.000000, manual=551.250000, diff=-0.250000
+[SUMMARY] total_checked=4096, mismatches=48
+[MISMATCH] iter=0 tid=88: PTX=554.000000, manual=553.500000, diff=0.500000
+[MISMATCH] iter=3 tid=119: PTX=-559.000000, manual=-558.750000, diff=-0.250000
+[MISMATCH] iter=4 tid=41: PTX=747.000000, manual=746.750000, diff=0.250000
+[MISMATCH] iter=4 tid=126: PTX=805.000000, manual=804.750000, diff=0.250000
+[SUMMARY] total_checked=4096, mismatches=30
+[MISMATCH] iter=1 tid=107: PTX=584.000000, manual=584.250000, diff=-0.250000
+[MISMATCH] iter=3 tid=45: PTX=263.000000, manual=263.250000, diff=-0.250000
+[MISMATCH] iter=4 tid=18: PTX=-267.000000, manual=-266.750000, diff=-0.250000
+[MISMATCH] iter=4 tid=89: PTX=898.000000, manual=897.750000, diff=0.250000
+[MISMATCH] iter=5 tid=55: PTX=240.500000, manual=240.750000, diff=-0.250000
+[SUMMARY] total_checked=4096, mismatches=31
+[MISMATCH] iter=0 tid=9: PTX=626.000000, manual=626.250000, diff=-0.250000
+[MISMATCH] iter=0 tid=25: PTX=-563.000000, manual=-562.500000, diff=-0.500000
+[MISMATCH] iter=0 tid=34: PTX=-731.000000, manual=-731.250000, diff=0.250000
+[MISMATCH] iter=0 tid=44: PTX=-601.000000, manual=-600.750000, diff=-0.250000
+[MISMATCH] iter=0 tid=61: PTX=803.000000, manual=803.250000, diff=-0.250000
+[SUMMARY] total_checked=4096, mismatches=32
+[MISMATCH] iter=0 tid=111: PTX=1142.000000, manual=1142.250000, diff=-0.250000
+[MISMATCH] iter=0 tid=114: PTX=-611.000000, manual=-611.250000, diff=0.250000
+[MISMATCH] iter=0 tid=115: PTX=619.000000, manual=618.750000, diff=0.250000
+[SUMMARY] total_checked=4096, mismatches=39
+[MISMATCH] iter=0 tid=43: PTX=-529.000000, manual=-528.750000, diff=-0.250000
+[MISMATCH] iter=1 tid=98: PTX=601.000000, manual=600.750000, diff=0.250000
+[MISMATCH] iter=1 tid=117: PTX=550.000000, manual=549.750000, diff=0.250000
+[MISMATCH] iter=3 tid=2: PTX=614.000000, manual=613.750000, diff=0.250000
+[SUMMARY] total_checked=4096, mismatches=39
+[MISMATCH] iter=0 tid=107: PTX=355.000000, manual=354.750000, diff=0.250000
+[MISMATCH] iter=0 tid=81: PTX=-52.000000, manual=-51.750000, diff=-0.250000
+[MISMATCH] iter=1 tid=62: PTX=553.000000, manual=552.750000, diff=0.250000
+[MISMATCH] iter=3 tid=5: PTX=-727.000000, manual=-726.750000, diff=-0.250000
+[MISMATCH] iter=1 tid=94: PTX=1114.000000, manual=1114.500000, diff=-0.500000
+[SUMMARY] total_checked=4096, mismatches=41
+[MISMATCH] iter=0 tid=46: PTX=-596.000000, manual=-596.250000, diff=0.250000
+[MISMATCH] iter=0 tid=119: PTX=-505.000000, manual=-504.750000, diff=-0.250000
+[MISMATCH] iter=3 tid=78: PTX=-695.000000, manual=-695.250000, diff=0.250000
+[MISMATCH] iter=3 tid=39: PTX=-622.000000, manual=-621.750000, diff=-0.250000
+[MISMATCH] iter=6 tid=29: PTX=553.000000, manual=552.750000, diff=0.250000
+[SUMMARY] total_checked=4096, mismatches=36
+[MISMATCH] iter=3 tid=60: PTX=880.000000, manual=879.750000, diff=0.250000
+[MISMATCH] iter=3 tid=123: PTX=-520.000000, manual=-519.750000, diff=-0.250000
+[MISMATCH] iter=4 tid=64: PTX=600.500000, manual=600.750000, diff=-0.250000
+[MISMATCH] iter=4 tid=77: PTX=762.500000, manual=762.250000, diff=0.250000
+[MISMATCH] iter=5 tid=30: PTX=-547.000000, manual=-546.750000, diff=-0.250000
+[SUMMARY] total_checked=4096, mismatches=36
+[MISMATCH] iter=2 tid=88: PTX=-598.000000, manual=-597.750000, diff=-0.250000
+[MISMATCH] iter=3 tid=7: PTX=-632.000000, manual=-632.250000, diff=0.250000
+[MISMATCH] iter=3 tid=63: PTX=369.500000, manual=369.750000, diff=-0.250000
+[MISMATCH] iter=6 tid=103: PTX=952.000000, manual=951.750000, diff=0.250000
+[MISMATCH] iter=5 tid=54: PTX=523.000000, manual=522.750000, diff=0.250000
+[SUMMARY] total_checked=4096, mismatches=35
+[MISMATCH] iter=0 tid=39: PTX=100.000000, manual=99.750000, diff=0.250000
+[MISMATCH] iter=0 tid=104: PTX=1070.000000, manual=1069.500000, diff=0.500000
+[MISMATCH] iter=0 tid=81: PTX=-569.000000, manual=-569.250000, diff=0.250000
+[MISMATCH] iter=2 tid=126: PTX=-817.000000, manual=-816.750000, diff=-0.250000
+[MISMATCH] iter=2 tid=63: PTX=569.000000, manual=569.250000, diff=-0.250000
+[SUMMARY] total_checked=4096, mismatches=46
+[MISMATCH] iter=0 tid=72: PTX=863.000000, manual=862.500000, diff=0.500000
+[MISMATCH] iter=0 tid=107: PTX=460.000000, manual=460.250000, diff=-0.250000
+[MISMATCH] iter=1 tid=8: PTX=520.000000, manual=519.750000, diff=0.250000
+[MISMATCH] iter=1 tid=13: PTX=244.000000, manual=243.750000, diff=0.250000
+[MISMATCH] iter=1 tid=29: PTX=335.250000, manual=335.000000, diff=0.250000
+[SUMMARY] total_checked=4096, mismatches=40
+[MISMATCH] iter=3 tid=88: PTX=-700.000000, manual=-699.750000, diff=-0.250000
+[MISMATCH] iter=5 tid=39: PTX=-538.000000, manual=-537.750000, diff=-0.250000
+[MISMATCH] iter=9 tid=99: PTX=-604.000000, manual=-603.750000, diff=-0.250000
+[MISMATCH] iter=9 tid=102: PTX=657.000000, manual=656.750000, diff=0.250000
+[MISMATCH] iter=9 tid=23: PTX=650.500000, manual=650.250000, diff=0.250000
+[SUMMARY] total_checked=4096, mismatches=24
+[MISMATCH] iter=0 tid=69: PTX=956.000000, manual=956.250000, diff=-0.250000
+[MISMATCH] iter=1 tid=32: PTX=-524.000000, manual=-524.250000, diff=0.250000
+[MISMATCH] iter=3 tid=123: PTX=-614.000000, manual=-614.250000, diff=0.250000
+[MISMATCH] iter=2 tid=79: PTX=-683.000000, manual=-683.250000, diff=0.250000
+[MISMATCH] iter=7 tid=3: PTX=-709.000000, manual=-708.750000, diff=-0.250000
+[SUMMARY] total_checked=4096, mismatches=19
+[...] 881 lines omitted```"

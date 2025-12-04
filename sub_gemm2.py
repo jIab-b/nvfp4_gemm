@@ -76,6 +76,9 @@ struct Gemm_params {
     index_t sf_row_stride;
 };
 
+__device__ int g_mismatch_count = 0;
+__device__ int g_total_count = 0;
+
 __device__ __forceinline__ void load_row_block(
     const __nv_fp4x2_e2m1* row_ptr,
     const uint16_t*        row_scale_ptr,
@@ -318,8 +321,8 @@ gemm_kernel(const __grid_constant__ Gemm_params params)
             load_col_block(colB_ptrs[ci], colS_ptrs[ci], elem_base, scale_block_base, b_regs, sfb_reg);
             float result = block_scaled_fma_16x2fp4(a_regs, b_regs, sfa_reg, sfb_reg);
 
-            // DEBUG: manual compute for first iter, thread 0, col 0
-            if (DEBUG_FIRST_CTA && is_first_cta && iter == 0 && tid == 0 && ci == 0) {
+            // DEBUG: manual compute for first CTA, all iterations
+            if (DEBUG_FIRST_CTA && is_first_cta && ci == 0) {
                 const uint8_t* a_bytes = reinterpret_cast<const uint8_t*>(&a_regs[0]);
                 const uint8_t* b_bytes = reinterpret_cast<const uint8_t*>(&b_regs[0]);
                 uint8_t sfa_lo = sfa_reg & 0xFF;
@@ -352,9 +355,16 @@ gemm_kernel(const __grid_constant__ Gemm_params params)
                     manual_sum += scale1 * (a_lo * b_lo + a_hi * b_hi);
                 }
 
-                printf("[COMPUTE DEBUG] iter=%d tid=%d: PTX=%.6f, manual=%.6f, scale0=%.6f, scale1=%.6f, match=%s\\n",
-                       iter, tid, result, manual_sum, scale0, scale1,
-                       (fabsf(result - manual_sum) < 1e-3f) ? "YES" : "NO");
+                atomicAdd(&g_total_count, 1);
+                bool match = fabsf(result - manual_sum) < 1e-3f;
+                if (!match) {
+                    atomicAdd(&g_mismatch_count, 1);
+                    // Only print first few mismatches to avoid flooding
+                    if (g_mismatch_count <= 5) {
+                        printf("[MISMATCH] iter=%d tid=%d: PTX=%.6f, manual=%.6f, diff=%.6f\\n",
+                               iter, tid, result, manual_sum, result - manual_sum);
+                    }
+                }
             }
 
             accum[ci] += result;
@@ -401,6 +411,13 @@ gemm_kernel(const __grid_constant__ Gemm_params params)
             out_ptr[0] = __float2half(value);
         }
     }
+
+    // Print summary at the end (only one thread)
+    if (DEBUG_FIRST_CTA && is_first_cta && tid == 0) {
+        __syncthreads();
+        __threadfence();
+        printf("[SUMMARY] total_checked=%d, mismatches=%d\\n", g_total_count, g_mismatch_count);
+    }
 }
 
 torch::Tensor cuda_nvfp4_gemm(
@@ -432,7 +449,13 @@ torch::Tensor cuda_nvfp4_gemm(
     params.row_stride = A.stride(0);
     params.sf_row_stride = SFA.stride(0);
 
+    // Reset debug counters
+    int zero = 0;
+    cudaMemcpyToSymbol(g_mismatch_count, &zero, sizeof(int));
+    cudaMemcpyToSymbol(g_total_count, &zero, sizeof(int));
+
     gemm_kernel<M_TILE, K_WORKERS, N_TILE, true><<<grid_dim, block_dim, 0>>>(params);
+    cudaDeviceSynchronize();
     return C;
 }
 """
