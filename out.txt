@@ -1,7 +1,7 @@
 "**NVIDIA on GitHub ✅ success**
-> Workflow [19980818028](<https://github.com/gpu-mode/discord-cluster-manager/actions/runs/19980818028>) completed
+> Workflow [19986192194](<https://github.com/gpu-mode/discord-cluster-manager/actions/runs/19986192194>) completed
 > Downloading artifacts... done
-> ❌ Benchmarking failed
+> ❌ Running benchmarks failed (internal error 1)
 
 Running on:
 * GPU: `NVIDIA B200`
@@ -9,19 +9,50 @@ Running on:
 * Runtime: `CUDA`
 * Platform: `Linux-6.8.0-51-generic-x86_64-with-glibc2.35`
 * Torch: `2.9.1+cu130`
+# Running failed
+Command ```bash
+python3 eval.py benchmark /tmp/tmpjjgsz40c```
+exited with error code **1** after 3.63 seconds.
 
-
-## Benchmarks:
+## Program stderr:
 ```
-❌ k: 16384; l: 1; m: 128; n: 7168; seed: 1111 failed testing:
+multiprocessing.pool.RemoteTraceback: 
+\"\"\"
+Traceback (most recent call last):
+  File \"/usr/lib/python3.10/multiprocessing/pool.py\", line 125, in worker
+    result = (True, func(*args, **kwds))
+  File \"/home/runner/_work/discord-cluster-manager/discord-cluster-manager/eval.py\", line 233, in _run_single_benchmark
+    good, message = check_implementation(reference_output, custom_output)
+  File \"/home/runner/_work/discord-cluster-manager/discord-cluster-manager/utils.py\", line 156, in wrapped
+    return match_reference(data, output, reference=reference, **kwargs)
+  File \"/home/runner/_work/discord-cluster-manager/discord-cluster-manager/utils.py\", line 141, in match_reference
+    expected = reference(data)
+  File \"/home/runner/_work/discord-cluster-manager/discord-cluster-manager/reference.py\", line 44, in ref_kernel
+    res = torch._scaled_mm(
+RuntimeError: CUDA error: CUBLAS_STATUS_INTERNAL_ERROR when calling `cublasCreate(handle)`
+\"\"\"
 
-mismatch found! custom implementation doesn't match reference: Number of mismatched elements: 917489 ERROR AT (0, 0, 0): -6112.0 -2724.0 ERROR AT (0, 1, 0): 0.0 -1902.0 ERROR AT (0, 2, 0): 0.0 -3638.0 ERROR AT (0, 3, 0): 0.0 133.0 ERROR AT (0, 4, 0): 0.0 -2102.0 ... and 917484 more mismatched elements.
+The above exception was the direct cause of the following exception:
 
-❌ k: 7168; l: 1; m: 128; n: 4096; seed: 1111 failed testing:
+Traceback (most recent call last):
+  File \"/home/runner/_work/discord-cluster-manager/discord-cluster-manager/eval.py\", line 498, in <module>
+    sys.exit(main())
+  File \"/home/runner/_work/discord-cluster-manager/discord-cluster-manager/eval.py\", line 466, in main
+    return run_benchmarking(logger, pool, tests)
+  File \"/home/runner/_work/discord-cluster-manager/discord-cluster-manager/eval.py\", line 319, in run_benchmarking
+    run_single_benchmark(pool, tests[0], False, 200, 10e7)
+  File \"/home/runner/_work/discord-cluster-manager/discord-cluster-manager/eval.py\", line 304, in run_single_benchmark
+    return pool.apply(_run_single_benchmark, (test, recheck, max_repeats, max_time_ns))
+  File \"/usr/lib/python3.10/multiprocessing/pool.py\", line 360, in apply
+    return self.apply_async(func, args, kwds).get()
+  File \"/usr/lib/python3.10/multiprocessing/pool.py\", line 774, in get
+    raise self._value
+RuntimeError: CUDA error: CUBLAS_STATUS_INTERNAL_ERROR when calling `cublasCreate(handle)````
 
-mismatch found! custom implementation doesn't match reference: Number of mismatched elements: 524277 ERROR AT (0, 0, 0): -439.0 51.0 ERROR AT (0, 1, 0): 0.0 2352.0 ERROR AT (0, 2, 0): 0.0 1932.0 ERROR AT (0, 3, 0): 0.0 1252.0 ERROR AT (0, 4, 0): 0.0 -3704.0 ... and 524272 more mismatched elements.
-
-❌ k: 2048; l: 1; m: 128; n: 7168; seed: 1111 failed testing:
-
-mismatch found! custom implementation doesn't match reference: Number of mismatched elements: 917476 ERROR AT (0, 0, 0): -3122.0 -1864.0 ERROR AT (0, 1, 0): 0.0 -1639.0 ERROR AT (0, 2, 0): 0.0 1939.0 ERROR AT (0, 3, 0): 0.0 658.0 ERROR AT (0, 4, 0): 0.0 1111.0 ... and 917471 more mismatched elements.
-```"
+## Program stdout:
+```
+[INIT] smem_base=0x400, tmem_d=0x0, tmem_sfa=0x40, tmem_sfb=0x41
+[INIT] idesc=0x08110480
+[INIT] num_k_tiles=256
+[DESC] a_desc=0x0000400200020041, b_desc=0x0000400200020141
+[SF] sfa_desc=0x00004001000101c1, sfb_desc=0x0000400100010241```"
