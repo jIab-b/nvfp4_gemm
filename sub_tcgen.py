@@ -98,7 +98,7 @@ __device__ __forceinline__ uint32_t make_mxf4_idesc(int M_tile, int N_tile)
     uint32_t idesc = 0;
     idesc |= (1U << 7);                           // atype = E2M1
     idesc |= (1U << 10);                          // btype = E2M1
-    idesc |= (1U << 16);                          // Transpose B (B is NxK, MMA expects KxN)
+    idesc |= (0U << 16);                          // Transpose B (B is NxK, MMA expects KxN)
     idesc |= ((N_tile >> 3) & 0x3F) << 17;        // N >> 3
     idesc |= (0U) << 23;                          // UE4M3 scale type
     idesc |= ((M_tile >> 7) & 0x3) << 27;         // M >> 7
@@ -291,8 +291,16 @@ gemm_kernel_tcgen05(const __grid_constant__ Gemm_params params)
         uint32_t enable_d = (k_tile > 0) ? 1 : 0;
 
         if (k_tile == 0) {
-            DEBUG_PRINT("[K0] Before tcgen05.mma: tmem_d=0x%x, enable_d=%u\\n", tmem_d, enable_d);
+            DEBUG_PRINT("[K0] Before tcgen05.mma:\\n");
+            DEBUG_PRINT("  %%0 tmem_d    = 0x%x (TMEM addr for D output)\\n", tmem_d);
+            DEBUG_PRINT("  %%1 a_desc    = 0x%llx (SMEM descriptor for A)\\n", (unsigned long long)a_desc);
+            DEBUG_PRINT("  %%2 b_desc    = 0x%llx (SMEM descriptor for B)\\n", (unsigned long long)b_desc);
+            DEBUG_PRINT("  %%3 idesc     = 0x%x (immediate desc: types/dims)\\n", idesc);
+            DEBUG_PRINT("  %%4 tmem_sfa  = 0x%x (TMEM addr for scale A)\\n", tmem_sfa);
+            DEBUG_PRINT("  %%5 tmem_sfb  = 0x%x (TMEM addr for scale B)\\n", tmem_sfb);
+            DEBUG_PRINT("  %%6 enable_d  = %u (predicate: accumulate if 1)\\n", enable_d);
         }
+        __syncthreads();
         if (threadIdx.x == 0) {
             asm volatile(
                 "{\\n"
