@@ -1,0 +1,12 @@
+## 13.24. Changes in PTX ISA Version 6.1 
+
+New Features
+
+PTX ISA version 6.1 introduces the following new features:
+
+* Support for `sm_72` target architecture.
+* Support for new matrix shapes `32x8x16` and `8x32x16` in `wmma` instruction.
+
+Semantic Changes and Clarifications
+
+None.

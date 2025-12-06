@@ -1,0 +1,19 @@
+### 8.4.1. mmio Operation 
+
+An *mmio* operation is a memory operation with `.mmio` qualifier specified. It is usually performed
+on a memory location which is mapped to the control registers of peer I/O devices. It can also be
+used for communication between threads but has poor performance relative to non-*mmio* operations.
+
+The semantic meaning of *mmio* operations cannot be defined precisely as it is defined by the
+underlying I/O device. For formal specification of semantics of *mmio* operation from Memory
+Consistency Model perspective, it is equivalent to the semantics of a *strong* operation. But it
+follows a few implementation-specific properties, if it meets the *CUDA atomicity requirements* at
+the specified scope:
+
+* Writes are always performed and are never combined within the scope specified.
+* Reads are always performed, and are not forwarded, prefetched, combined, or allowed to hit any
+  cache within the scope specified.
+
+  + As an exception, in some implementations, the surrounding locations may also be loaded. In such
+    cases the amount of data loaded is implementation specific and varies between 32 and 128 bytes
+    in size.

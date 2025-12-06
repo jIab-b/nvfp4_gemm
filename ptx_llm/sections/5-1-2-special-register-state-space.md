@@ -1,0 +1,5 @@
+### 5.1.2. Special Register State Space 
+
+The special register (`.sreg`) state space holds predefined, platform-specific registers, such as
+grid, cluster, CTA, and thread parameters, clock counters, and performance monitoring registers. All
+special registers are predefined.

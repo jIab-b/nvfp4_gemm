@@ -1,0 +1,8 @@
+## 4.2. Comments 
+
+Comments in PTX follow C/C++ syntax, using non-nested `/*` and `*/` for comments that may span
+multiple lines, and using `//` to begin a comment that extends up to the next newline character,
+which terminates the current line. Comments cannot occur within character constants, string
+literals, or within other comments.
+
+Comments in PTX are treated as whitespace.

@@ -89,6 +89,7 @@ __device__ __forceinline__ void load_col_block(
     );
 }
 
+
 __device__ __forceinline__ float block_scaled_fma_16x2fp4(
     const uint64_t (&a_regs)[2],
     const uint64_t (&b_regs)[2],
@@ -108,26 +109,30 @@ __device__ __forceinline__ float block_scaled_fma_16x2fp4(
         ".reg .b8 b0_4, b0_5, b0_6, b0_7;\\n"
 
         ".reg .f16x2 sfa_f16x2, sfb_f16x2, sf_f16x2;\\n"
-        ".reg .f16x2 scale0_f16x2, scale1_f16x2;\\n"
-        ".reg .f16x2 accum_total, accum_group;\\n"
+        ".reg .f16x2 accum_group;\\n"
+        ".reg .f16 sf0, sf1, grp_lo, grp_hi;\\n"
+        ".reg .f32 scale0, scale1, acc_lo, acc_hi, tmp_lo, tmp_hi;\\n"
 
         ".reg .f16x2 cvt_0_0, cvt_0_1, cvt_0_2, cvt_0_3;\\n"
         ".reg .f16x2 cvt_0_4, cvt_0_5, cvt_0_6, cvt_0_7;\\n"
         ".reg .f16x2 cvt_1_0, cvt_1_1, cvt_1_2, cvt_1_3;\\n"
         ".reg .f16x2 cvt_1_4, cvt_1_5, cvt_1_6, cvt_1_7;\\n"
 
-        ".reg .f16 lane0, lane1, result_f16;\\n"
         ".reg .f32 result_f32;\\n"
 
+        // Convert scales to f32
         "cvt.rn.f16x2.e4m3x2 sfa_f16x2, %5;\\n"
         "cvt.rn.f16x2.e4m3x2 sfb_f16x2, %6;\\n"
         "mul.rn.f16x2 sf_f16x2, sfa_f16x2, sfb_f16x2;\\n"
-        "mov.b32 {lane0, lane1}, sf_f16x2;\\n"
-        "mov.b32 scale0_f16x2, {lane0, lane0};\\n"
-        "mov.b32 scale1_f16x2, {lane1, lane1};\\n"
+        "mov.b32 {sf0, sf1}, sf_f16x2;\\n"
+        "cvt.f32.f16 scale0, sf0;\\n"
+        "cvt.f32.f16 scale1, sf1;\\n"
 
-        "mov.b32 accum_total, 0;\\n"
+        // Initialize f32 accumulators
+        "mov.b32 acc_lo, 0;\\n"
+        "mov.b32 acc_hi, 0;\\n"
 
+        // First 16 elements (first 8 bytes)
         "mov.b32 {a0_0, a0_1, a0_2, a0_3}, %1;\\n"
         "mov.b32 {a0_4, a0_5, a0_6, a0_7}, %2;\\n"
         "mov.b32 {b0_0, b0_1, b0_2, b0_3}, %3;\\n"
@@ -150,6 +155,7 @@ __device__ __forceinline__ float block_scaled_fma_16x2fp4(
         "cvt.rn.f16x2.e2m1x2 cvt_0_7, a0_7;\\n"
         "cvt.rn.f16x2.e2m1x2 cvt_1_7, b0_7;\\n"
 
+        // Accumulate 8 products in f16x2
         "mov.b32 accum_group, 0;\\n"
         "fma.rn.f16x2 accum_group, cvt_0_0, cvt_1_0, accum_group;\\n"
         "fma.rn.f16x2 accum_group, cvt_0_1, cvt_1_1, accum_group;\\n"
@@ -159,9 +165,15 @@ __device__ __forceinline__ float block_scaled_fma_16x2fp4(
         "fma.rn.f16x2 accum_group, cvt_0_5, cvt_1_5, accum_group;\\n"
         "fma.rn.f16x2 accum_group, cvt_0_6, cvt_1_6, accum_group;\\n"
         "fma.rn.f16x2 accum_group, cvt_0_7, cvt_1_7, accum_group;\\n"
-        "mul.rn.f16x2 accum_group, scale0_f16x2, accum_group;\\n"
-        "add.rn.f16x2 accum_total, accum_total, accum_group;\\n"
 
+        // Convert to f32, multiply by scale0, accumulate
+        "mov.b32 {grp_lo, grp_hi}, accum_group;\\n"
+        "cvt.f32.f16 tmp_lo, grp_lo;\\n"
+        "cvt.f32.f16 tmp_hi, grp_hi;\\n"
+        "fma.rn.f32 acc_lo, tmp_lo, scale0, acc_lo;\\n"
+        "fma.rn.f32 acc_hi, tmp_hi, scale0, acc_hi;\\n"
+
+        // Second 16 elements (next 8 bytes)
         "mov.b32 {a0_0, a0_1, a0_2, a0_3}, %7;\\n"
         "mov.b32 {a0_4, a0_5, a0_6, a0_7}, %8;\\n"
         "mov.b32 {b0_0, b0_1, b0_2, b0_3}, %9;\\n"
@@ -184,6 +196,7 @@ __device__ __forceinline__ float block_scaled_fma_16x2fp4(
         "cvt.rn.f16x2.e2m1x2 cvt_0_7, a0_7;\\n"
         "cvt.rn.f16x2.e2m1x2 cvt_1_7, b0_7;\\n"
 
+        // Accumulate 8 products in f16x2
         "mov.b32 accum_group, 0;\\n"
         "fma.rn.f16x2 accum_group, cvt_0_0, cvt_1_0, accum_group;\\n"
         "fma.rn.f16x2 accum_group, cvt_0_1, cvt_1_1, accum_group;\\n"
@@ -193,12 +206,16 @@ __device__ __forceinline__ float block_scaled_fma_16x2fp4(
         "fma.rn.f16x2 accum_group, cvt_0_5, cvt_1_5, accum_group;\\n"
         "fma.rn.f16x2 accum_group, cvt_0_6, cvt_1_6, accum_group;\\n"
         "fma.rn.f16x2 accum_group, cvt_0_7, cvt_1_7, accum_group;\\n"
-        "mul.rn.f16x2 accum_group, scale1_f16x2, accum_group;\\n"
-        "add.rn.f16x2 accum_total, accum_total, accum_group;\\n"
 
-        "mov.b32 {lane0, lane1}, accum_total;\\n"
-        "add.rn.f16 result_f16, lane0, lane1;\\n"
-        "cvt.f32.f16 result_f32, result_f16;\\n"
+        // Convert to f32, multiply by scale1, accumulate
+        "mov.b32 {grp_lo, grp_hi}, accum_group;\\n"
+        "cvt.f32.f16 tmp_lo, grp_lo;\\n"
+        "cvt.f32.f16 tmp_hi, grp_hi;\\n"
+        "fma.rn.f32 acc_lo, tmp_lo, scale1, acc_lo;\\n"
+        "fma.rn.f32 acc_hi, tmp_hi, scale1, acc_hi;\\n"
+
+        // Final sum
+        "add.rn.f32 result_f32, acc_lo, acc_hi;\\n"
         "mov.b32 %0, result_f32;\\n"
         "}\\n"
         : "=f"(out_f32)
