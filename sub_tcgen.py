@@ -234,76 +234,54 @@ gemm_kernel_tcgen05(const __grid_constant__ Gemm_params params)
         }
 
         // =====================================================================
-        // BUILD SMEM DESCRIPTORS
+        // BUILD SMEM DESCRIPTORS (for A and B matrices only)
         // =====================================================================
         uint64_t a_desc = make_smem_desc(a_smem, MMA_K / 2, MMA_K / 2, 0);
         uint64_t b_desc = make_smem_desc(b_smem, MMA_K / 2, MMA_K / 2, 0);
-        uint64_t sfa_desc = make_smem_desc(sfa_smem, SF_ROW_STRIDE, SF_ROW_STRIDE, 0);
-        uint64_t sfb_desc = make_smem_desc(sfb_smem, SF_ROW_STRIDE, SF_ROW_STRIDE, 0);
 
         if (k_tile == 0) {
             DEBUG_PRINT("[K0] a_desc=0x%016llx, b_desc=0x%016llx\\n",
                         (unsigned long long)a_desc, (unsigned long long)b_desc);
-            DEBUG_PRINT("[K0] sfa_desc=0x%016llx, sfb_desc=0x%016llx\\n",
-                        (unsigned long long)sfa_desc, (unsigned long long)sfb_desc);
         }
 
 
         // =====================================================================
-        // COPY SCALE FACTORS: SMEM -> TMEM
+        // STORE SCALE FACTORS: SMEM -> Registers -> TMEM (via tcgen05.st)
         // =====================================================================
-        if (k_tile == 0) {
-            DEBUG_PRINT("[K0] Before tcgen05.cp SFA: tmem_sfa=0x%x\\n", tmem_sfa);
-        }
-        if (threadIdx.x == 0) {
-            // SFA: 128 lanes via 128x128b
-            asm volatile(
-                "tcgen05.cp.cta_group::1.128x128b [%0], %1;\\n"
-                :: "r"(tmem_sfa), "l"(sfa_desc) : "memory"
-            );
-        }
-        if (k_tile == 0) {
-            DEBUG_PRINT("[K0] After tcgen05.cp SFA\\n");
-            DEBUG_PRINT("[K0] Before tcgen05.cp SFB: tmem_sfb=0x%x\\n", tmem_sfb);
-        }
+        // Each thread loads its scale factor (4 bytes = 1 word per lane)
+        const int lane_id = threadIdx.x % 32;
+        const int warp_id = threadIdx.x / 32;
+        const int global_lane = warp_id * 32 + lane_id;
 
-        __syncthreads();
-        if (threadIdx.x == 0) {
-            // SFB: 128 lanes via 128x128b (padded from 64 to avoid warpx2 crash)
-            asm volatile(
-                "tcgen05.cp.cta_group::1.128x128b [%0], %1;\\n"
-                :: "r"(tmem_sfb), "l"(sfb_desc) : "memory"
-            );
-        }
-        if (k_tile == 0) {
-            DEBUG_PRINT("[K0] After tcgen05.cp SFB\\n");
-            DEBUG_PRINT("[K0] Before tcgen05.commit SF: mbar=%p\\n", mbar);
-        }
-        if (threadIdx.x == 0) {
-            // Commit scale factor copies (use smem offset, not pointer)
-            asm volatile(
-                "tcgen05.commit.cta_group::1.mbarrier::arrive::one.b64 [%0];\\n"
-                :: "r"(mbar_smem) : "memory"
-            );
-        }
-        __syncthreads();
+        // Load SFA: 128 rows, all lanes get data
+        uint32_t sfa_val = *reinterpret_cast<uint32_t*>(sfa_smem + global_lane * SF_ROW_STRIDE);
+
+        // Load SFB: 64 rows, only first 64 lanes get real data
+        uint32_t sfb_val = (global_lane < MMA_N)
+            ? *reinterpret_cast<uint32_t*>(sfb_smem + global_lane * SF_ROW_STRIDE)
+            : 0;
 
         if (k_tile == 0) {
-            DEBUG_PRINT("[K0] After tcgen05.commit SF, waiting on mbar_smem=0x%x, phase=%d\\n", mbar_smem, mbar_phase);
+            DEBUG_PRINT("[K0] Before tcgen05.st SFA: tmem_sfa=0x%x, sfa_val=0x%x\\n", tmem_sfa, sfa_val);
         }
 
-        // Wait for scale factor copies
-        uint32_t done = 0;
-        while (!done) {
-            asm volatile(
-                "{.reg .pred p; mbarrier.try_wait.parity.shared::cta.b64 p, [%1], %2; selp.u32 %0, 1, 0, p;}\\n"
-                : "=r"(done) : "r"(mbar_smem), "r"(mbar_phase) : "memory"
-            );
-        }
-        mbar_phase ^= 1;
+        // Store SFA to TMEM - all warps participate, each stores to its 32 lanes
+        asm volatile(
+            "tcgen05.st.sync.aligned.32x32b.x1.b32 [%0], {%1};\\n"
+            :: "r"(tmem_sfa), "r"(sfa_val) : "memory"
+        );
+
+        // Store SFB to TMEM (no DEBUG_PRINT between - causes divergence issues)
+        asm volatile(
+            "tcgen05.st.sync.aligned.32x32b.x1.b32 [%0], {%1};\\n"
+            :: "r"(tmem_sfb), "r"(sfb_val) : "memory"
+        );
+
+        // Wait for stores to complete before MMA
+        asm volatile("tcgen05.wait::st.sync.aligned;\\n" ::: "memory");
 
         if (k_tile == 0) {
-            DEBUG_PRINT("[K0] SF copy done, mbar_phase now=%d\\n", mbar_phase);
+            DEBUG_PRINT("[K0] SF stores done, sfa_val=0x%x, sfb_val=0x%x\\n", sfa_val, sfb_val);
         }
 
 
@@ -345,7 +323,7 @@ gemm_kernel_tcgen05(const __grid_constant__ Gemm_params params)
         }
 
         // Wait for MMA
-        done = 0;
+        uint32_t done = 0;
         while (!done) {
             asm volatile(
                 "{.reg .pred p; mbarrier.try_wait.parity.shared::cta.b64 p, [%1], %2; selp.u32 %0, 1, 0, p;}\\n"
