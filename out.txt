@@ -1,5 +1,5 @@
 "**NVIDIA on GitHub ✅ success**
-> Workflow [19986192194](<https://github.com/gpu-mode/discord-cluster-manager/actions/runs/19986192194>) completed
+> Workflow [19987512764](<https://github.com/gpu-mode/discord-cluster-manager/actions/runs/19987512764>) completed
 > Downloading artifacts... done
 > ❌ Running benchmarks failed (internal error 1)
 
@@ -11,8 +11,8 @@ Running on:
 * Torch: `2.9.1+cu130`
 # Running failed
 Command ```bash
-python3 eval.py benchmark /tmp/tmpjjgsz40c```
-exited with error code **1** after 3.63 seconds.
+python3 eval.py benchmark /tmp/tmpndkex7mh```
+exited with error code **1** after 3.53 seconds.
 
 ## Program stderr:
 ```
@@ -51,8 +51,14 @@ RuntimeError: CUDA error: CUBLAS_STATUS_INTERNAL_ERROR when calling `cublasCreat
 
 ## Program stdout:
 ```
-[INIT] smem_base=0x400, tmem_d=0x0, tmem_sfa=0x40, tmem_sfb=0x41
+[INIT] smem_base=0x400, tmem_d=0x0, tmem_sfa=0x40, tmem_sfb=0x50
 [INIT] idesc=0x08110480
 [INIT] num_k_tiles=256
-[DESC] a_desc=0x0000400200020041, b_desc=0x0000400200020141
-[SF] sfa_desc=0x00004001000101c1, sfb_desc=0x0000400100010241```"
+[K0] Tiles loaded to SMEM, a_smem=0x7ffd00000410, b_smem=0x7ffd00001410
+[K0] sfa_smem=0x7ffd00001c10, sfb_smem=0x7ffd00002410
+[K0] a_desc=0x0000400200020041, b_desc=0x0000400200020141
+[K0] sfa_desc=0x00004001000101c1, sfb_desc=0x0000400100010241
+[K0] Before tcgen05.cp SFA: tmem_sfa=0x40
+[K0] After tcgen05.cp SFA
+[K0] Before tcgen05.cp SFB: tmem_sfb=0x50
+[K0] After tcgen05.cp SFB```"

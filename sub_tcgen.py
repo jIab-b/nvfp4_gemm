@@ -43,7 +43,7 @@ static constexpr int SF_ROW_STRIDE = 16;  // 16-byte aligned for descriptors
 #define SMEM_A_TILE      (MMA_M * MMA_K / 2)                  // A tile: 128*64/2 = 4096 bytes
 #define SMEM_B_TILE      (MMA_N * MMA_K / 2)                  // B tile: 64*64/2 = 2048 bytes
 #define SMEM_SFA         (MMA_M * SF_ROW_STRIDE)              // SFA: 128*16 = 2048 bytes
-#define SMEM_SFB         (MMA_N * SF_ROW_STRIDE)              // SFB: 64*16 = 1024 bytes
+#define SMEM_SFB         (MMA_M * SF_ROW_STRIDE)              // SFB: padded to 128*16 = 2048 bytes (avoid warpx2 multicast)
 
 #define SMEM_OFF_MBAR    8                                    // mbar at offset 8 (8-byte aligned)
 #define SMEM_OFF_TILES   16                                   // tiles start after mbar
@@ -137,8 +137,8 @@ gemm_kernel_tcgen05(const __grid_constant__ Gemm_params params)
     }
     __syncthreads();
     uint32_t tmem_d = *tmem_addr_storage;
-    uint32_t tmem_sfa = tmem_d + MMA_N;
-    uint32_t tmem_sfb = tmem_d + MMA_N + 1;
+    uint32_t tmem_sfa = tmem_d + MMA_N;           // column 64
+    uint32_t tmem_sfb = tmem_d + MMA_N + 4;       // column 68
 
     DEBUG_PRINT("[INIT] smem_base=0x%x, tmem_d=0x%x, tmem_sfa=0x%x, tmem_sfb=0x%x\\n",
                 smem_base, tmem_d, tmem_sfa, tmem_sfb);
@@ -218,10 +218,12 @@ gemm_kernel_tcgen05(const __grid_constant__ Gemm_params params)
             sfa_smem[i] = (s < 4) ? sfa_global[m * params.sfa_row_stride + s] : 0;
         }
 
-        for (int i = threadIdx.x; i < MMA_N * SF_ROW_STRIDE; i += blockDim.x) {
+        // Pad SFB to 128 rows to use .128x128b (avoid .64x128b.warpx2 which crashes)
+        for (int i = threadIdx.x; i < MMA_M * SF_ROW_STRIDE; i += blockDim.x) {
             int n = i / SF_ROW_STRIDE;
             int s = i % SF_ROW_STRIDE;
-            sfb_smem[i] = (s < 4) ? sfb_global[n * params.sfb_row_stride + s] : 0;
+            // Only first MMA_N rows have real data, rest are zero-padded
+            sfb_smem[i] = (n < MMA_N && s < 4) ? sfb_global[n * params.sfb_row_stride + s] : 0;
         }
 
         __syncthreads();
@@ -264,10 +266,12 @@ gemm_kernel_tcgen05(const __grid_constant__ Gemm_params params)
             DEBUG_PRINT("[K0] After tcgen05.cp SFA\\n");
             DEBUG_PRINT("[K0] Before tcgen05.cp SFB: tmem_sfb=0x%x\\n", tmem_sfb);
         }
+
+        __syncthreads();
         if (threadIdx.x == 0) {
-            // SFB: 64 lanes via 64x128b with warpx2 multicast
+            // SFB: 128 lanes via 128x128b (padded from 64 to avoid warpx2 crash)
             asm volatile(
-                "tcgen05.cp.cta_group::1.64x128b.warpx2::02_13 [%0], %1;\\n"
+                "tcgen05.cp.cta_group::1.128x128b [%0], %1;\\n"
                 :: "r"(tmem_sfb), "l"(sfb_desc) : "memory"
             );
         }
@@ -276,10 +280,10 @@ gemm_kernel_tcgen05(const __grid_constant__ Gemm_params params)
             DEBUG_PRINT("[K0] Before tcgen05.commit SF: mbar=%p\\n", mbar);
         }
         if (threadIdx.x == 0) {
-            // Commit scale factor copies
+            // Commit scale factor copies (use smem offset, not pointer)
             asm volatile(
                 "tcgen05.commit.cta_group::1.mbarrier::arrive::one.b64 [%0];\\n"
-                :: "l"((uint64_t)mbar) : "memory"
+                :: "r"(mbar_smem) : "memory"
             );
         }
         __syncthreads();
@@ -328,10 +332,10 @@ gemm_kernel_tcgen05(const __grid_constant__ Gemm_params params)
             DEBUG_PRINT("[K0] Before tcgen05.commit MMA\\n");
         }
         if (threadIdx.x == 0) {
-            // Commit MMA
+            // Commit MMA (use smem offset, not pointer)
             asm volatile(
                 "tcgen05.commit.cta_group::1.mbarrier::arrive::one.b64 [%0];\\n"
-                :: "l"((uint64_t)mbar) : "memory"
+                :: "r"(mbar_smem) : "memory"
             );
         }
         __syncthreads();
