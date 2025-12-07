@@ -32,10 +32,10 @@ static constexpr int MMA_N = 64;
 static constexpr int MMA_K = 64;
 static constexpr int WARPS_PER_CTA = 4;
 static constexpr int THREADS_PER_WARP = 32;
-// Layout D (4x1): each M-block (32 rows) uses 64 columns, so D needs 4*64=256 cols
-// Plus scales: SFA needs 4 cols, SFB needs 4 cols = 8 cols
-// Total: 256 + 8 = 264, round to 512 (power of 2)
-static constexpr int TMEM_COLS = 512;
+// Layout D (4x1): D uses MMA_N columns (64), accessed via lane offsets for M-blocks
+// SFA needs 4 cols, SFB needs 2 cols (for N=64)
+// Total: 64 + 4 + 2 = 70, round to 128 (power of 2)
+static constexpr int TMEM_COLS = 128;
 static constexpr int SF_ROW_STRIDE = 16;  // 16-byte aligned for descriptors
 
 // ============================================================================
@@ -66,6 +66,7 @@ struct Gemm_params {
     int debug_block_y;
 };
 
+// Debug disabled - too many kernel launches
 #define DEBUG_PRINT(fmt, ...) do {} while(0)
 
 // ============================================================================
@@ -132,10 +133,12 @@ gemm_kernel_tcgen05(const __grid_constant__ Gemm_params params)
     }
     __syncthreads();
     uint32_t tmem_d = *tmem_addr_storage;
-    // D uses 4 M-blocks × 64 N-columns = 256 columns (0-255)
-    // Scales start at column 256
-    uint32_t tmem_sfa = tmem_d + (4 * MMA_N);     // column 256
-    uint32_t tmem_sfb = tmem_d + (4 * MMA_N) + 4; // column 260
+    // Per f212.txt: D uses columns 0 to N-1 (64 columns for MMA_N=64)
+    // Different M-blocks accessed via lane offsets, not column offsets
+    // SFA needs 4 columns (one per 32-row M-block)
+    // SFB needs 2 columns (one per 32-col N-block, N=64)
+    uint32_t tmem_sfa = tmem_d + MMA_N;           // column 64
+    uint32_t tmem_sfb = tmem_d + MMA_N + 4;       // column 68
 
     DEBUG_PRINT("[INIT] smem_base=0x%x, tmem_d=0x%x, tmem_sfa=0x%x, tmem_sfb=0x%x\\n",
                 smem_base, tmem_d, tmem_sfa, tmem_sfb);
@@ -241,6 +244,7 @@ gemm_kernel_tcgen05(const __grid_constant__ Gemm_params params)
         uint64_t a_desc = make_smem_desc(a_smem, 128, 256, 0);
         uint64_t b_desc = make_smem_desc(b_smem, 128, 256, 0);
 
+
         // =====================================================================
         // LOAD SCALE FACTORS: GMEM -> Registers -> TMEM (direct, skip SMEM)
         // Per f233.txt/f242.txt: each 32-row block uses lanes 0-31 in separate columns
@@ -268,6 +272,8 @@ gemm_kernel_tcgen05(const __grid_constant__ Gemm_params params)
         // Address format: bits [31:16]=lane, bits [15:0]=column
         // All warps use lanes 0-31 (implicit from thread's lane_id), different columns
         uint32_t sf_col_offset = warp_id;
+
+
         asm volatile(
             "tcgen05.st.sync.aligned.32x32b.x1.b32 [%0], {%1};\\n"
             :: "r"(tmem_sfa + sf_col_offset), "r"(sfa_val) : "memory"
@@ -328,22 +334,21 @@ gemm_kernel_tcgen05(const __grid_constant__ Gemm_params params)
     const int warp_id = threadIdx.x / 32;
     const int out_m = warp_id * 32 + lane_id;
 
-    // Layout D for M=128 + cta_group::1 uses 4x1 organization
-    // Each M-block (32 rows) uses lanes 0-31 with different column base
-    // Similar to scale factor layout (see f233.txt)
-    // Warp 0: M0-31 at columns 0-63, warp 1: M32-63 at columns 64-127, etc.
-    // But wait - that would need 256 columns for D alone!
-    //
-    // Alternative: maybe N is also split - first 32 N cols, then next 32
-    // Let's try: column = (warp_id * 32) + (n_chunk % 32) with n_block offset
-    // Actually just try column offset for M-blocks first:
-    uint32_t m_col_offset = warp_id * MMA_N;  // Each M-block gets 64 columns
+    // Layout D for M=128 + cta_group::1 uses 4x1 organization (per f211.txt/f212.txt)
+    // Address format: bits [31:16] = lane offset, bits [15:0] = column
+    // Per f212.txt:
+    //   M0-31:   0x0000.0XXX -> lane offset 0,  columns 0-N
+    //   M32-63:  0x0020.0XXX -> lane offset 32, columns 0-N
+    //   M64-95:  0x0040.0XXX -> lane offset 64, columns 0-N
+    //   M96-127: 0x0060.0XXX -> lane offset 96, columns 0-N
+    // All warps read from same columns (0 to N-1), but different lane partitions
+    uint32_t lane_offset = warp_id * 32;  // 0, 32, 64, 96 for warps 0-3
 
     float acc_regs[MMA_N];
 
     #pragma unroll
     for (int n_chunk = 0; n_chunk < MMA_N; n_chunk += 8) {
-        uint32_t taddr = tmem_d + m_col_offset + n_chunk;
+        uint32_t taddr = tmem_d + (lane_offset << 16) + n_chunk;
         uint32_t r[8];
         asm volatile(
             "tcgen05.ld.sync.aligned.32x32b.x8.b32 {%0,%1,%2,%3,%4,%5,%6,%7}, [%8];\\n"
@@ -359,9 +364,11 @@ gemm_kernel_tcgen05(const __grid_constant__ Gemm_params params)
 
     asm volatile("tcgen05.wait::ld.sync.aligned;\\n" ::: "memory");
 
-    DEBUG_PRINT("[LOAD] acc_regs[0]=%.2f, acc_regs[1]=%.2f, acc_regs[2]=%.2f, acc_regs[3]=%.2f\\n",
-                acc_regs[0], acc_regs[1], acc_regs[2], acc_regs[3]);
-
+    // Debug: print D values for lane 0 (M=0 for warp 0) across N
+    if (blockIdx.x == 0 && blockIdx.y == 0 && lane_id == 0 && warp_id == 0) {
+        printf("[D] M0: n0=%.2f n31=%.2f n32=%.2f n63=%.2f\\n",
+               acc_regs[0], acc_regs[31], acc_regs[32], acc_regs[63]);
+    }
 
     // =========================================================================
     // STORE RESULTS TO GLOBAL MEMORY

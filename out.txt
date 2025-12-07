@@ -1,5 +1,5 @@
 "**NVIDIA on GitHub ✅ success**
-> Workflow [19999246429](<https://github.com/gpu-mode/discord-cluster-manager/actions/runs/19999246429>) completed
+> Workflow [20001854820](<https://github.com/gpu-mode/discord-cluster-manager/actions/runs/20001854820>) completed
 > Downloading artifacts... done
 > ❌ Benchmarking failed
 
@@ -15,13 +15,405 @@ Running on:
 ```
 ❌ k: 16384; l: 1; m: 128; n: 7168; seed: 1111 failed testing:
 
-mismatch found! custom implementation doesn't match reference: Number of mismatched elements: 802688 ERROR AT (0, 32, 0): -1458.0 -2448.0 ERROR AT (0, 33, 0): 7136.0 5484.0 ERROR AT (0, 34, 0): -4708.0 908.0 ERROR AT (0, 35, 0): -1658.0 -645.5 ERROR AT (0, 36, 0): 945.5 -389.5 ... and 802683 more mismatched elements.
+mismatch found! custom implementation doesn't match reference: Number of mismatched elements: 802407 ERROR AT (0, 32, 0): -3028.0 -2448.0 ERROR AT (0, 33, 0): 1922.0 5484.0 ERROR AT (0, 34, 0): 1242.0 908.0 ERROR AT (0, 35, 0): -2560.0 -645.5 ERROR AT (0, 36, 0): -1469.0 -389.5 ... and 802402 more mismatched elements.
 
 ❌ k: 7168; l: 1; m: 128; n: 4096; seed: 1111 failed testing:
 
-mismatch found! custom implementation doesn't match reference: Number of mismatched elements: 458665 ERROR AT (0, 32, 0): 124.25 1750.0 ERROR AT (0, 33, 0): -1312.0 -817.0 ERROR AT (0, 34, 0): 6300.0 2740.0 ERROR AT (0, 35, 0): 1538.0 1592.0 ERROR AT (0, 36, 0): -2766.0 -2518.0 ... and 458660 more mismatched elements.
+mismatch found! custom implementation doesn't match reference: Number of mismatched elements: 458430 ERROR AT (0, 32, 0): 352.0 1750.0 ERROR AT (0, 33, 0): 1634.0 -817.0 ERROR AT (0, 34, 0): 2926.0 2740.0 ERROR AT (0, 35, 0): 624.0 1592.0 ERROR AT (0, 36, 0): -125.5 -2518.0 ... and 458425 more mismatched elements.
 
 ❌ k: 2048; l: 1; m: 128; n: 7168; seed: 1111 failed testing:
 
-mismatch found! custom implementation doesn't match reference: Number of mismatched elements: 802669 ERROR AT (0, 32, 0): 3078.0 965.5 ERROR AT (0, 33, 0): -158.0 1426.0 ERROR AT (0, 34, 0): 2760.0 1757.0 ERROR AT (0, 35, 0): -2952.0 -1148.0 ERROR AT (0, 36, 0): 957.0 -361.0 ... and 802664 more mismatched elements.
-```"
+mismatch found! custom implementation doesn't match reference: Number of mismatched elements: 793192 ERROR AT (0, 32, 0): -254.5 965.5 ERROR AT (0, 33, 0): 299.0 1426.0 ERROR AT (0, 34, 0): 1901.0 1757.0 ERROR AT (0, 35, 0): -2070.0 -1148.0 ERROR AT (0, 36, 0): 975.5 -361.0 ... and 793187 more mismatched elements.
+```
+
+## Program stdout:
+```
+[INIT] smem_base=0x400, tmem_d=0x0, tmem_sfa=0x40, tmem_sfb=0x44
+[INIT] idesc=0x08100480
+[INIT] num_k_tiles=256
+[D] M0: n0=-2723.00 n31=-3201.75 n32=0.00 n63=0.00
+[INIT] smem_base=0x400, tmem_d=0x0, tmem_sfa=0x40, tmem_sfb=0x44
+[INIT] idesc=0x08100480
+[INIT] num_k_tiles=256
+[D] M0: n0=922.50 n31=-967.75 n32=0.00 n63=0.00
+[INIT] smem_base=0x400, tmem_d=0x0, tmem_sfa=0x40, tmem_sfb=0x44
+[INIT] idesc=0x08100480
+[INIT] num_k_tiles=256
+[D] M0: n0=-999.25 n31=-749.75 n32=0.00 n63=0.00
+[INIT] smem_base=0x400, tmem_d=0x0, tmem_sfa=0x40, tmem_sfb=0x44
+[INIT] idesc=0x08100480
+[INIT] num_k_tiles=256
+[D] M0: n0=1061.50 n31=-4582.00 n32=-3693.25 n63=-5194.50
+[INIT] smem_base=0x400, tmem_d=0x0, tmem_sfa=0x40, tmem_sfb=0x44
+[INIT] idesc=0x08100480
+[INIT] num_k_tiles=256
+[D] M0: n0=529.75 n31=-4752.50 n32=-8564.50 n63=-9589.75
+[INIT] smem_base=0x400, tmem_d=0x0, tmem_sfa=0x40, tmem_sfb=0x44
+[INIT] idesc=0x08100480
+[INIT] num_k_tiles=256
+[D] M0: n0=2983.75 n31=-2963.25 n32=-7330.50 n63=5172.50
+[INIT] smem_base=0x400, tmem_d=0x0, tmem_sfa=0x40, tmem_sfb=0x44
+[INIT] idesc=0x08100480
+[INIT] num_k_tiles=256
+[D] M0: n0=-528.75 n31=4776.50 n32=-130.25 n63=4664.00
+[INIT] smem_base=0x400, tmem_d=0x0, tmem_sfa=0x40, tmem_sfb=0x44
+[INIT] idesc=0x08100480
+[INIT] num_k_tiles=256
+[D] M0: n0=1172.50 n31=3110.75 n32=1976.50 n63=4126.50
+[INIT] smem_base=0x400, tmem_d=0x0, tmem_sfa=0x40, tmem_sfb=0x44
+[INIT] idesc=0x08100480
+[INIT] num_k_tiles=256
+[D] M0: n0=1064.25 n31=-1335.75 n32=2583.00 n63=1809.00
+[INIT] smem_base=0x400, tmem_d=0x0, tmem_sfa=0x40, tmem_sfb=0x44
+[INIT] idesc=0x08100480
+[INIT] num_k_tiles=256
+[D] M0: n0=5048.25 n31=-465.25 n32=799.00 n63=-2733.75
+[INIT] smem_base=0x400, tmem_d=0x0, tmem_sfa=0x40, tmem_sfb=0x44
+[INIT] idesc=0x08100480
+[INIT] num_k_tiles=256
+[D] M0: n0=-644.25 n31=-11.25 n32=-1661.00 n63=-3865.00
+[INIT] smem_base=0x400, tmem_d=0x0, tmem_sfa=0x40, tmem_sfb=0x44
+[INIT] idesc=0x08100480
+[INIT] num_k_tiles=256
+[D] M0: n0=-987.00 n31=586.00 n32=-1461.00 n63=-5777.25
+[INIT] smem_base=0x400, tmem_d=0x0, tmem_sfa=0x40, tmem_sfb=0x44
+[INIT] idesc=0x08100480
+[INIT] num_k_tiles=256
+[D] M0: n0=4562.25 n31=-7954.00 n32=3802.00 n63=2013.00
+[INIT] smem_base=0x400, tmem_d=0x0, tmem_sfa=0x40, tmem_sfb=0x44
+[INIT] idesc=0x08100480
+[INIT] num_k_tiles=256
+[D] M0: n0=-4845.50 n31=-4997.75 n32=-529.25 n63=-4471.50
+[INIT] smem_base=0x400, tmem_d=0x0, tmem_sfa=0x40, tmem_sfb=0x44
+[INIT] idesc=0x08100480
+[INIT] num_k_tiles=256
+[D] M0: n0=-4138.25 n31=-133.00 n32=4338.75 n63=-2168.50
+[INIT] smem_base=0x400, tmem_d=0x0, tmem_sfa=0x40, tmem_sfb=0x44
+[INIT] idesc=0x08100480
+[INIT] num_k_tiles=256
+[D] M0: n0=1896.75 n31=-762.00 n32=1248.00 n63=1403.25
+[INIT] smem_base=0x400, tmem_d=0x0, tmem_sfa=0x40, tmem_sfb=0x44
+[INIT] idesc=0x08100480
+[INIT] num_k_tiles=256
+[D] M0: n0=311.00 n31=-538.75 n32=-65.50 n63=-4569.00
+[INIT] smem_base=0x400, tmem_d=0x0, tmem_sfa=0x40, tmem_sfb=0x44
+[INIT] idesc=0x08100480
+[INIT] num_k_tiles=256
+[D] M0: n0=1268.50 n31=919.75 n32=4539.75 n63=-1480.50
+[INIT] smem_base=0x400, tmem_d=0x0, tmem_sfa=0x40, tmem_sfb=0x44
+[INIT] idesc=0x08100480
+[INIT] num_k_tiles=256
+[D] M0: n0=3772.75 n31=2445.50 n32=-9455.75 n63=327.00
+[INIT] smem_base=0x400, tmem_d=0x0, tmem_sfa=0x40, tmem_sfb=0x44
+[INIT] idesc=0x08100480
+[INIT] num_k_tiles=256
+[D] M0: n0=970.00 n31=604.25 n32=-4090.50 n63=1186.00
+[INIT] smem_base=0x400, tmem_d=0x0, tmem_sfa=0x40, tmem_sfb=0x44
+[INIT] idesc=0x08100480
+[INIT] num_k_tiles=256
+[D] M0: n0=532.25 n31=3962.25 n32=-2809.25 n63=860.25
+[INIT] smem_base=0x400, tmem_d=0x0, tmem_sfa=0x40, tmem_sfb=0x44
+[INIT] idesc=0x08100480
+[INIT] num_k_tiles=256
+[D] M0: n0=-183.50 n31=-8240.00 n32=313.00 n63=2364.50
+[INIT] smem_base=0x400, tmem_d=0x0, tmem_sfa=0x40, tmem_sfb=0x44
+[INIT] idesc=0x08100480
+[INIT] num_k_tiles=256
+[D] M0: n0=7059.75 n31=4211.75 n32=7.50 n63=1756.50
+[INIT] smem_base=0x400, tmem_d=0x0, tmem_sfa=0x40, tmem_sfb=0x44
+[INIT] idesc=0x08100480
+[INIT] num_k_tiles=256
+[D] M0: n0=2454.50 n31=88.00 n32=-303.25 n63=1180.50
+[INIT] smem_base=0x400, tmem_d=0x0, tmem_sfa=0x40, tmem_sfb=0x44
+[INIT] idesc=0x08100480
+[INIT] num_k_tiles=256
+[D] M0: n0=4414.50 n31=1897.00 n32=775.50 n63=2984.75
+[INIT] smem_base=0x400, tmem_d=0x0, tmem_sfa=0x40, tmem_sfb=0x44
+[INIT] idesc=0x08100480
+[INIT] num_k_tiles=256
+[D] M0: n0=-4171.75 n31=5787.50 n32=4705.50 n63=-2885.50
+[INIT] smem_base=0x400, tmem_d=0x0, tmem_sfa=0x40, tmem_sfb=0x44
+[INIT] idesc=0x08100480
+[INIT] num_k_tiles=256
+[D] M0: n0=-3184.25 n31=-851.75 n32=-741.50 n63=533.25
+[INIT] smem_base=0x400, tmem_d=0x0, tmem_sfa=0x40, tmem_sfb=0x44
+[INIT] idesc=0x08100480
+[INIT] num_k_tiles=256
+[D] M0: n0=395.25 n31=-2218.75 n32=-556.75 n63=1678.00
+[INIT] smem_base=0x400, tmem_d=0x0, tmem_sfa=0x40, tmem_sfb=0x44
+[INIT] idesc=0x08100480
+[INIT] num_k_tiles=256
+[D] M0: n0=-3117.75 n31=5576.50 n32=739.75 n63=-172.00
+[INIT] smem_base=0x400, tmem_d=0x0, tmem_sfa=0x40, tmem_sfb=0x44
+[INIT] idesc=0x08100480
+[INIT] num_k_tiles=256
+[D] M0: n0=336.50 n31=6809.75 n32=630.75 n63=-1788.50
+[INIT] smem_base=0x400, tmem_d=0x0, tmem_sfa=0x40, tmem_sfb=0x44
+[INIT] idesc=0x08100480
+[INIT] num_k_tiles=256
+[D] M0: n0=5619.50 n31=-5242.75 n32=943.25 n63=4160.75
+[INIT] smem_base=0x400, tmem_d=0x0, tmem_sfa=0x40, tmem_sfb=0x44
+[INIT] idesc=0x08100480
+[INIT] num_k_tiles=256
+[D] M0: n0=-175.75 n31=-4038.50 n32=145.00 n63=840.25
+[INIT] smem_base=0x400, tmem_d=0x0, tmem_sfa=0x40, tmem_sfb=0x44
+[INIT] idesc=0x08100480
+[INIT] num_k_tiles=256
+[D] M0: n0=5817.25 n31=1101.75 n32=-5978.75 n63=137.00
+[INIT] smem_base=0x400, tmem_d=0x0, tmem_sfa=0x40, tmem_sfb=0x44
+[INIT] idesc=0x08100480
+[INIT] num_k_tiles=256
+[D] M0: n0=-5335.50 n31=-752.00 n32=-2231.00 n63=-1524.25
+[INIT] smem_base=0x400, tmem_d=0x0, tmem_sfa=0x40, tmem_sfb=0x44
+[INIT] idesc=0x08100480
+[INIT] num_k_tiles=256
+[D] M0: n0=824.50 n31=-4666.50 n32=-3661.00 n63=-710.25
+[INIT] smem_base=0x400, tmem_d=0x0, tmem_sfa=0x40, tmem_sfb=0x44
+[INIT] idesc=0x08100480
+[INIT] num_k_tiles=256
+[D] M0: n0=1910.50 n31=-1640.75 n32=5213.75 n63=1001.50
+[INIT] smem_base=0x400, tmem_d=0x0, tmem_sfa=0x40, tmem_sfb=0x44
+[INIT] idesc=0x08100480
+[INIT] num_k_tiles=256
+[D] M0: n0=6785.75 n31=1995.00 n32=-868.50 n63=-8508.00
+[INIT] smem_base=0x400, tmem_d=0x0, tmem_sfa=0x40, tmem_sfb=0x44
+[INIT] idesc=0x08100480
+[INIT] num_k_tiles=256
+[D] M0: n0=-1145.00 n31=-2068.25 n32=7901.00 n63=-302.00
+[INIT] smem_base=0x400, tmem_d=0x0, tmem_sfa=0x40, tmem_sfb=0x44
+[INIT] idesc=0x08100480
+[INIT] num_k_tiles=256
+[D] M0: n0=-3451.00 n31=9352.75 n32=-10992.25 n63=-604.25
+[INIT] smem_base=0x400, tmem_d=0x0, tmem_sfa=0x40, tmem_sfb=0x44
+[INIT] idesc=0x08100480
+[INIT] num_k_tiles=256
+[D] M0: n0=-1162.00 n31=-6271.00 n32=-1455.75 n63=3881.25
+[INIT] smem_base=0x400, tmem_d=0x0, tmem_sfa=0x40, tmem_sfb=0x44
+[INIT] idesc=0x08100480
+[INIT] num_k_tiles=256
+[D] M0: n0=1518.50 n31=1348.25 n32=-114.00 n63=-3831.00
+[INIT] smem_base=0x400, tmem_d=0x0, tmem_sfa=0x40, tmem_sfb=0x44
+[INIT] idesc=0x08100480
+[INIT] num_k_tiles=256
+[D] M0: n0=-1536.00 n31=-5498.50 n32=1480.25 n63=-2874.00
+[INIT] smem_base=0x400, tmem_d=0x0, tmem_sfa=0x40, tmem_sfb=0x44
+[INIT] idesc=0x08100480
+[INIT] num_k_tiles=256
+[D] M0: n0=-2100.50 n31=-1278.25 n32=-4087.75 n63=-1220.25
+[INIT] smem_base=0x400, tmem_d=0x0, tmem_sfa=0x40, tmem_sfb=0x44
+[INIT] idesc=0x08100480
+[INIT] num_k_tiles=256
+[D] M0: n0=-1083.50 n31=-3742.25 n32=13846.25 n63=10366.25
+[INIT] smem_base=0x400, tmem_d=0x0, tmem_sfa=0x40, tmem_sfb=0x44
+[INIT] idesc=0x08100480
+[INIT] num_k_tiles=256
+[D] M0: n0=-5065.00 n31=-2433.00 n32=-1369.25 n63=-2208.00
+[INIT] smem_base=0x400, tmem_d=0x0, tmem_sfa=0x40, tmem_sfb=0x44
+[INIT] idesc=0x08100480
+[INIT] num_k_tiles=256
+[D] M0: n0=-2582.50 n31=-5806.00 n32=-6148.50 n63=-3036.00
+[INIT] smem_base=0x400, tmem_d=0x0, tmem_sfa=0x40, tmem_sfb=0x44
+[INIT] idesc=0x08100480
+[INIT] num_k_tiles=256
+[D] M0: n0=3996.00 n31=5037.00 n32=1659.75 n63=-1353.25
+[INIT] smem_base=0x400, tmem_d=0x0, tmem_sfa=0x40, tmem_sfb=0x44
+[INIT] idesc=0x08100480
+[INIT] num_k_tiles=256
+[D] M0: n0=-2278.75 n31=5398.00 n32=2073.75 n63=-1510.75
+[INIT] smem_base=0x400, tmem_d=0x0, tmem_sfa=0x40, tmem_sfb=0x44
+[INIT] idesc=0x08100480
+[INIT] num_k_tiles=256
+[D] M0: n0=-475.00 n31=2528.25 n32=-7216.75 n63=-4424.50
+[INIT] smem_base=0x400, tmem_d=0x0, tmem_sfa=0x40, tmem_sfb=0x44
+[INIT] idesc=0x08100480
+[INIT] num_k_tiles=256
+[D] M0: n0=8785.00 n31=3155.50 n32=-383.25 n63=4195.00
+[INIT] smem_base=0x400, tmem_d=0x0, tmem_sfa=0x40, tmem_sfb=0x44
+[INIT] idesc=0x08100480
+[INIT] num_k_tiles=256
+[D] M0: n0=-2723.00 n31=-3201.75 n32=-3027.50 n63=-2236.25
+[INIT] smem_base=0x400, tmem_d=0x0, tmem_sfa=0x40, tmem_sfb=0x44
+[INIT] idesc=0x08100480
+[INIT] num_k_tiles=256
+[D] M0: n0=922.50 n31=-967.75 n32=-957.75 n63=-3021.25
+[INIT] smem_base=0x400, tmem_d=0x0, tmem_sfa=0x40, tmem_sfb=0x44
+[INIT] idesc=0x08100480
+[INIT] num_k_tiles=256
+[D] M0: n0=-999.25 n31=-749.75 n32=-798.25 n63=-713.75
+[INIT] smem_base=0x400, tmem_d=0x0, tmem_sfa=0x40, tmem_sfb=0x44
+[INIT] idesc=0x08100480
+[INIT] num_k_tiles=256
+[D] M0: n0=1061.50 n31=-4582.00 n32=-3575.75 n63=-2237.50
+[INIT] smem_base=0x400, tmem_d=0x0, tmem_sfa=0x40, tmem_sfb=0x44
+[INIT] idesc=0x08100480
+[INIT] num_k_tiles=256
+[D] M0: n0=529.75 n31=-4752.50 n32=-570.25 n63=-3532.00
+[INIT] smem_base=0x400, tmem_d=0x0, tmem_sfa=0x40, tmem_sfb=0x44
+[INIT] idesc=0x08100480
+[INIT] num_k_tiles=256
+[D] M0: n0=2983.75 n31=-2963.25 n32=-3998.75 n63=3428.75
+[INIT] smem_base=0x400, tmem_d=0x0, tmem_sfa=0x40, tmem_sfb=0x44
+[INIT] idesc=0x08100480
+[INIT] num_k_tiles=256
+[D] M0: n0=-528.75 n31=4776.50 n32=-1690.75 n63=-560.25
+[INIT] smem_base=0x400, tmem_d=0x0, tmem_sfa=0x40, tmem_sfb=0x44
+[INIT] idesc=0x08100480
+[INIT] num_k_tiles=256
+[D] M0: n0=1172.50 n31=3110.75 n32=893.75 n63=2765.75
+[INIT] smem_base=0x400, tmem_d=0x0, tmem_sfa=0x40, tmem_sfb=0x44
+[INIT] idesc=0x08100480
+[INIT] num_k_tiles=256
+[D] M0: n0=1064.25 n31=-1335.75 n32=3749.00 n63=-1340.50
+[INIT] smem_base=0x400, tmem_d=0x0, tmem_sfa=0x40, tmem_sfb=0x44
+[INIT] idesc=0x08100480
+[INIT] num_k_tiles=256
+[D] M0: n0=5048.25 n31=-465.25 n32=932.75 n63=-1457.50
+[INIT] smem_base=0x400, tmem_d=0x0, tmem_sfa=0x40, tmem_sfb=0x44
+[INIT] idesc=0x08100480
+[INIT] num_k_tiles=256
+[D] M0: n0=-644.25 n31=-11.25 n32=-1661.00 n63=-3865.00
+[INIT] smem_base=0x400, tmem_d=0x0, tmem_sfa=0x40, tmem_sfb=0x44
+[INIT] idesc=0x08100480
+[INIT] num_k_tiles=256
+[D] M0: n0=-987.00 n31=586.00 n32=-3430.25 n63=-791.25
+[INIT] smem_base=0x400, tmem_d=0x0, tmem_sfa=0x40, tmem_sfb=0x44
+[INIT] idesc=0x08100480
+[INIT] num_k_tiles=256
+[D] M0: n0=4562.25 n31=-7954.00 n32=3802.00 n63=2013.00
+[INIT] smem_base=0x400, tmem_d=0x0, tmem_sfa=0x40, tmem_sfb=0x44
+[INIT] idesc=0x08100480
+[INIT] num_k_tiles=256
+[D] M0: n0=-4845.50 n31=-4997.75 n32=-62.00 n63=1547.00
+[INIT] smem_base=0x400, tmem_d=0x0, tmem_sfa=0x40, tmem_sfb=0x44
+[INIT] idesc=0x08100480
+[INIT] num_k_tiles=256
+[D] M0: n0=-4138.25 n31=-133.00 n32=4338.75 n63=-2168.50
+[INIT] smem_base=0x400, tmem_d=0x0, tmem_sfa=0x40, tmem_sfb=0x44
+[INIT] idesc=0x08100480
+[INIT] num_k_tiles=256
+[D] M0: n0=1896.75 n31=-762.00 n32=-2478.50 n63=-1553.25
+[INIT] smem_base=0x400, tmem_d=0x0, tmem_sfa=0x40, tmem_sfb=0x44
+[INIT] idesc=0x08100480
+[INIT] num_k_tiles=256
+[D] M0: n0=311.00 n31=-538.75 n32=2029.75 n63=-15.25
+[INIT] smem_base=0x400, tmem_d=0x0, tmem_sfa=0x40, tmem_sfb=0x44
+[INIT] idesc=0x08100480
+[INIT] num_k_tiles=256
+[D] M0: n0=1268.50 n31=919.75 n32=3184.75 n63=960.00
+[INIT] smem_base=0x400, tmem_d=0x0, tmem_sfa=0x40, tmem_sfb=0x44
+[INIT] idesc=0x08100480
+[INIT] num_k_tiles=256
+[D] M0: n0=3772.75 n31=2445.50 n32=-12223.25 n63=6316.25
+[INIT] smem_base=0x400, tmem_d=0x0, tmem_sfa=0x40, tmem_sfb=0x44
+[INIT] idesc=0x08100480
+[INIT] num_k_tiles=256
+[D] M0: n0=970.00 n31=604.25 n32=-4090.50 n63=1186.00
+[INIT] smem_base=0x400, tmem_d=0x0, tmem_sfa=0x40, tmem_sfb=0x44
+[INIT] idesc=0x08100480
+[INIT] num_k_tiles=256
+[D] M0: n0=532.25 n31=3962.25 n32=-2809.25 n63=860.25
+[INIT] smem_base=0x400, tmem_d=0x0, tmem_sfa=0x40, tmem_sfb=0x44
+[INIT] idesc=0x08100480
+[INIT] num_k_tiles=256
+[D] M0: n0=-183.50 n31=-8240.00 n32=3425.00 n63=4570.50
+[INIT] smem_base=0x400, tmem_d=0x0, tmem_sfa=0x40, tmem_sfb=0x44
+[INIT] idesc=0x08100480
+[INIT] num_k_tiles=256
+[D] M0: n0=7059.75 n31=4211.75 n32=0.00 n63=3103.75
+[INIT] smem_base=0x400, tmem_d=0x0, tmem_sfa=0x40, tmem_sfb=0x44
+[INIT] idesc=0x08100480
+[INIT] num_k_tiles=256
+[D] M0: n0=2454.50 n31=88.00 n32=2335.00 n63=1703.00
+[INIT] smem_base=0x400, tmem_d=0x0, tmem_sfa=0x40, tmem_sfb=0x44
+[INIT] idesc=0x08100480
+[INIT] num_k_tiles=256
+[D] M0: n0=4414.50 n31=1897.00 n32=900.75 n63=821.25
+[INIT] smem_base=0x400, tmem_d=0x0, tmem_sfa=0x40, tmem_sfb=0x44
+[INIT] idesc=0x08100480
+[INIT] num_k_tiles=256
+[D] M0: n0=-4171.75 n31=5787.50 n32=-4981.75 n63=-2345.50
+[INIT] smem_base=0x400, tmem_d=0x0, tmem_sfa=0x40, tmem_sfb=0x44
+[INIT] idesc=0x08100480
+[INIT] num_k_tiles=256
+[D] M0: n0=-3184.25 n31=-851.75 n32=-5775.00 n63=1828.00
+[INIT] smem_base=0x400, tmem_d=0x0, tmem_sfa=0x40, tmem_sfb=0x44
+[INIT] idesc=0x08100480
+[INIT] num_k_tiles=256
+[D] M0: n0=395.25 n31=-2218.75 n32=681.75 n63=1149.00
+[INIT] smem_base=0x400, tmem_d=0x0, tmem_sfa=0x40, tmem_sfb=0x44
+[INIT] idesc=0x08100480
+[INIT] num_k_tiles=256
+[D] M0: n0=-3117.75 n31=5576.50 n32=1459.25 n63=4067.75
+[INIT] smem_base=0x400, tmem_d=0x0, tmem_sfa=0x40, tmem_sfb=0x44
+[INIT] idesc=0x08100480
+[INIT] num_k_tiles=256
+[D] M0: n0=336.50 n31=6809.75 n32=4691.25 n63=-1998.50
+[INIT] smem_base=0x400, tmem_d=0x0, tmem_sfa=0x40, tmem_sfb=0x44
+[INIT] idesc=0x08100480
+[INIT] num_k_tiles=256
+[D] M0: n0=5619.50 n31=-5242.75 n32=-3126.25 n63=5284.75
+[INIT] smem_base=0x400, tmem_d=0x0, tmem_sfa=0x40, tmem_sfb=0x44
+[INIT] idesc=0x08100480
+[INIT] num_k_tiles=256
+[D] M0: n0=-175.75 n31=-4038.50 n32=-8424.50 n63=-262.50
+[INIT] smem_base=0x400, tmem_d=0x0, tmem_sfa=0x40, tmem_sfb=0x44
+[INIT] idesc=0x08100480
+[INIT] num_k_tiles=256
+[D] M0: n0=5817.25 n31=1101.75 n32=1557.25 n63=-404.25
+[INIT] smem_base=0x400, tmem_d=0x0, tmem_sfa=0x40, tmem_sfb=0x44
+[INIT] idesc=0x08100480
+[INIT] num_k_tiles=256
+[D] M0: n0=-5335.50 n31=-752.00 n32=1653.00 n63=-535.25
+[INIT] smem_base=0x400, tmem_d=0x0, tmem_sfa=0x40, tmem_sfb=0x44
+[INIT] idesc=0x08100480
+[INIT] num_k_tiles=256
+[D] M0: n0=824.50 n31=-4666.50 n32=-6352.75 n63=2865.25
+[INIT] smem_base=0x400, tmem_d=0x0, tmem_sfa=0x40, tmem_sfb=0x44
+[INIT] idesc=0x08100480
+[INIT] num_k_tiles=256
+[D] M0: n0=1910.50 n31=-1640.75 n32=5213.75 n63=1001.50
+[INIT] smem_base=0x400, tmem_d=0x0, tmem_sfa=0x40, tmem_sfb=0x44
+[INIT] idesc=0x08100480
+[INIT] num_k_tiles=256
+[D] M0: n0=6785.75 n31=1995.00 n32=-1223.50 n63=-5753.50
+[INIT] smem_base=0x400, tmem_d=0x0, tmem_sfa=0x40, tmem_sfb=0x44
+[INIT] idesc=0x08100480
+[INIT] num_k_tiles=256
+[D] M0: n0=-1145.00 n31=-2068.25 n32=2424.50 n63=-10.50
+[INIT] smem_base=0x400, tmem_d=0x0, tmem_sfa=0x40, tmem_sfb=0x44
+[INIT] idesc=0x08100480
+[INIT] num_k_tiles=256
+[D] M0: n0=-3451.00 n31=9352.75 n32=-12703.25 n63=2317.50
+[INIT] smem_base=0x400, tmem_d=0x0, tmem_sfa=0x40, tmem_sfb=0x44
+[INIT] idesc=0x08100480
+[INIT] num_k_tiles=256
+[D] M0: n0=-1162.00 n31=-6271.00 n32=-3816.25 n63=5688.00
+[INIT] smem_base=0x400, tmem_d=0x0, tmem_sfa=0x40, tmem_sfb=0x44
+[INIT] idesc=0x08100480
+[INIT] num_k_tiles=256
+[D] M0: n0=1518.50 n31=1348.25 n32=1051.50 n63=-4754.75
+[INIT] smem_base=0x400, tmem_d=0x0, tmem_sfa=0x40, tmem_sfb=0x44
+[INIT] idesc=0x08100480
+[INIT] num_k_tiles=256
+[D] M0: n0=-1536.00 n31=-5498.50 n32=1480.25 n63=-2874.00
+[INIT] smem_base=0x400, tmem_d=0x0, tmem_sfa=0x40, tmem_sfb=0x44
+[INIT] idesc=0x08100480
+[INIT] num_k_tiles=256
+[D] M0: n0=-2100.50 n31=-1278.25 n32=-4087.75 n63=-1220.25
+[INIT] smem_base=0x400, tmem_d=0x0, tmem_sfa=0x40, tmem_sfb=0x44
+[INIT] idesc=0x08100480
+[INIT] num_k_tiles=256
+[D] M0: n0=-1083.50 n31=-3742.25 n32=6713.75 n63=7366.75
+[INIT] smem_base=0x400, tmem_d=0x0, tmem_sfa=0x40, tmem_sfb=0x44
+[INIT] idesc=0x08100480
+[INIT] num_k_tiles=256
+[D] M0: n0=-5065.00 n31=-2433.00 n32=-799.00 n63=-5376.50
+[INIT] smem_base=0x400, tmem_d=0x0, tmem_sfa=0x40, tmem_sfb=0x44
+[INIT] idesc=0x08100480
+[INIT] num_k_tiles=256
+[D] M0: n0=-2582.50 n31=-5806.00 n32=-1093.00 n63=-6244.50
+[INIT] smem_base=0x400, tmem_d=0x0, tmem_sfa=0x40, tmem_sfb=0x44
+[INIT] idesc=0x08100480
+[INIT] num_k_tiles=256
+[D] M0: n0=3996.00 n31=5037.00 n32=551.50 n63=1323.00
+[...] 413 lines omitted```"
