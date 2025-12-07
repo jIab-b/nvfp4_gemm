@@ -118,9 +118,6 @@ __device__ __forceinline__ void init_tmem_and_mbar(
     tmem_sfa = tmem_d + MMA_N;
     tmem_sfb = tmem_d + MMA_N + 4;
 
-    DEBUG_PRINT("[INIT] smem_base=0x%x, tmem_d=0x%x, tmem_sfa=0x%x, tmem_sfb=0x%x\\n",
-                smem_base, tmem_d, tmem_sfa, tmem_sfb);
-
     if (threadIdx.x == 0) {
         asm volatile("mbarrier.init.shared::cta.b64 [%0], %1;\\n"
             :: "r"(mbar_smem), "r"(1) : "memory");
@@ -280,8 +277,6 @@ __device__ __forceinline__ void load_accum_and_store(
 
     asm volatile("tcgen05.wait::ld.sync.aligned;\\n" ::: "memory");
 
-    DEBUG_PRINT("[D] M0: n0=%.2f n31=%.2f n32=%.2f n63=%.2f\\n",
-                acc_regs[0], acc_regs[31], acc_regs[32], acc_regs[63]);
 
     if (m_block + out_m < params.M) {
         #pragma unroll
@@ -326,12 +321,9 @@ gemm_kernel_tcgen05(const __grid_constant__ Gemm_params params)
     init_tmem_and_mbar(smem, smem_base, mbar_smem, tmem_d, tmem_sfa, tmem_sfb);
 
     uint32_t idesc = make_mxf4_idesc(MMA_M, MMA_N);
-    DEBUG_PRINT("[INIT] idesc=0x%08x\\n", idesc);
-
-    // --- K-LOOP ---
+   // --- K-LOOP ---
     const int num_k_tiles = params.K / MMA_K;
     int mbar_phase = 0;
-    DEBUG_PRINT("[INIT] num_k_tiles=%d\\n", num_k_tiles);
 
     for (int k_tile = 0; k_tile < num_k_tiles; k_tile++) {
         const int k_offset = k_tile * MMA_K;
@@ -345,6 +337,28 @@ gemm_kernel_tcgen05(const __grid_constant__ Gemm_params params)
         load_b_to_smem(params, n_block, k_offset, b_smem);
 
         __syncthreads();
+
+        // --- DEBUG: print raw A/B data for first k_tile ---
+        if (blockIdx.x == 0 && blockIdx.y == 0 && threadIdx.x == 0 && k_tile == 0) {
+            const uint8_t* a_raw = reinterpret_cast<const uint8_t*>(params.a_ptr);
+            const uint8_t* b_raw = reinterpret_cast<const uint8_t*>(params.b_ptr);
+            const uint16_t* sfa_raw = reinterpret_cast<const uint16_t*>(params.sfa_ptr);
+            const uint16_t* sfb_raw = reinterpret_cast<const uint16_t*>(params.sfb_ptr);
+            for (int iter = 0; iter < 4; iter++) {
+                int byte_off = iter * 16;
+                uint64_t a0 = *reinterpret_cast<const uint64_t*>(a_raw + byte_off);
+                uint64_t a1 = *reinterpret_cast<const uint64_t*>(a_raw + byte_off + 8);
+                uint16_t sfa = sfa_raw[iter];
+                printf("[TCGEN] iter=%d A row0: %016llx %016llx  SFA: %04x\\n", iter, a0, a1, sfa);
+            }
+            for (int iter = 0; iter < 4; iter++) {
+                int byte_off = iter * 16;
+                uint64_t b0 = *reinterpret_cast<const uint64_t*>(b_raw + byte_off);
+                uint64_t b1 = *reinterpret_cast<const uint64_t*>(b_raw + byte_off + 8);
+                uint16_t sfb = sfb_raw[iter];
+                printf("[TCGEN] iter=%d B col0: %016llx %016llx  SFB: %04x\\n", iter, b0, b1, sfb);
+            }
+        }
 
         // --- BUILD DESCRIPTORS ---
         uint64_t a_desc = make_smem_desc(a_smem, 128, 256, 0);

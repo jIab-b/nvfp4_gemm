@@ -288,6 +288,10 @@ gemm_kernel(const __grid_constant__ Gemm_params params)
         uint16_t sfa_reg;
         load_row_block(rowA, rowS, elem_base, scale_block_base, a_regs, sfa_reg);
 
+        if (row == 0 && col_start == 0 && iter < 4 && k_lane == 0) {
+            printf("[GEMM] iter=%d A row0: %016llx %016llx  SFA: %04x\\n", iter, a_regs[0], a_regs[1], sfa_reg);
+        }
+
         #pragma unroll
         for (int ci = 0; ci < N_TILE; ++ci) {
             if (!col_active[ci]) {
@@ -296,6 +300,11 @@ gemm_kernel(const __grid_constant__ Gemm_params params)
             uint64_t b_regs[2];
             uint16_t sfb_reg;
             load_col_block(colB_ptrs[ci], colS_ptrs[ci], elem_base, scale_block_base, b_regs, sfb_reg);
+
+            if (row == 0 && col_start == 0 && iter < 4 && k_lane == 0 && ci == 0) {
+                printf("[GEMM] iter=%d B col0: %016llx %016llx  SFB: %04x\\n", iter, b_regs[0], b_regs[1], sfb_reg);
+            }
+
             float result = block_scaled_fma_16x2fp4(a_regs, b_regs, sfa_reg, sfb_reg);
             accum[ci] += result;
         }
