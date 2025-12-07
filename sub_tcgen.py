@@ -66,12 +66,11 @@ struct Gemm_params {
     int debug_block_y;
 };
 
-// Debug disabled - too many kernel launches
-#define DEBUG_PRINT(fmt, ...) do {} while(0)
+#define DEBUG_PRINT(fmt, ...) do { \
+    if (blockIdx.x == 0 && blockIdx.y == 0 && threadIdx.x == 0) \
+        printf(fmt, ##__VA_ARGS__); \
+} while(0)
 
-// ============================================================================
-// Descriptor Helpers
-// ============================================================================
 __device__ __forceinline__ uint64_t make_smem_desc(
     const void* smem_ptr, int leading_dim_bytes, int stride_dim_bytes, int swizzle_mode = 0)
 {
@@ -79,7 +78,6 @@ __device__ __forceinline__ uint64_t make_smem_desc(
     uint64_t start_addr_enc = (addr & 0x3FFFF) >> 4;
     uint64_t lead_dim_enc = (leading_dim_bytes & 0x3FFFF) >> 4;
     uint64_t stride_dim_enc = (stride_dim_bytes & 0x3FFFF) >> 4;
-
     uint64_t desc = 0;
     desc |= (start_addr_enc & 0x3FFF);
     desc |= (lead_dim_enc & 0x3FFF) << 16;
@@ -92,39 +90,22 @@ __device__ __forceinline__ uint64_t make_smem_desc(
 __device__ __forceinline__ uint32_t make_mxf4_idesc(int M_tile, int N_tile)
 {
     uint32_t idesc = 0;
-    idesc |= (1U << 7);                           // atype = E2M1
-    idesc |= (1U << 10);                          // btype = E2M1
-    idesc |= (0U << 16);                          // Transpose B (B is NxK, MMA expects KxN)
-    idesc |= ((N_tile >> 3) & 0x3F) << 17;        // N >> 3
-    idesc |= (0U) << 23;                          // UE4M3 scale type
-    idesc |= ((M_tile >> 7) & 0x3) << 27;         // M >> 7
+    idesc |= (1U << 7);
+    idesc |= (1U << 10);
+    idesc |= (0U << 16);
+    idesc |= ((N_tile >> 3) & 0x3F) << 17;
+    idesc |= (0U) << 23;
+    idesc |= ((M_tile >> 7) & 0x3) << 27;
     return idesc;
 }
 
-// ============================================================================
-// Main Kernel
-// ============================================================================
-__global__ void __launch_bounds__(WARPS_PER_CTA * THREADS_PER_WARP)
-gemm_kernel_tcgen05(const __grid_constant__ Gemm_params params)
+// ----------------------------------------------------------------------------
+// SETUP / INIT
+// ----------------------------------------------------------------------------
+__device__ __forceinline__ void init_tmem_and_mbar(
+    char* smem, uint32_t smem_base, uint32_t mbar_smem,
+    uint32_t& tmem_d, uint32_t& tmem_sfa, uint32_t& tmem_sfb)
 {
-    // =========================================================================
-    // SHARED MEMORY LAYOUT
-    // =========================================================================
-    __shared__ char smem[SMEM_TOTAL];
-    uint32_t* tmem_addr_storage = reinterpret_cast<uint32_t*>(smem);
-    uint64_t* mbar = reinterpret_cast<uint64_t*>(smem + SMEM_OFF_MBAR);
-    char* tile_smem = smem + SMEM_OFF_TILES;
-    const uint32_t smem_base = __cvta_generic_to_shared(smem);
-    const uint32_t mbar_smem = smem_base + SMEM_OFF_MBAR;
-
-    const int m_block = blockIdx.y * MMA_M;
-    const int n_block = blockIdx.x * MMA_N;
-    if (m_block >= params.M || n_block >= params.N) return;
-
-
-    // =========================================================================
-    // TMEM ALLOCATION
-    // =========================================================================
     if (threadIdx.x < 32) {
         asm volatile(
             "tcgen05.alloc.cta_group::1.sync.aligned.shared::cta.b32 [%0], %1;\\n"
@@ -132,217 +113,152 @@ gemm_kernel_tcgen05(const __grid_constant__ Gemm_params params)
         );
     }
     __syncthreads();
-    uint32_t tmem_d = *tmem_addr_storage;
-    // Per f212.txt: D uses columns 0 to N-1 (64 columns for MMA_N=64)
-    // Different M-blocks accessed via lane offsets, not column offsets
-    // SFA needs 4 columns (one per 32-row M-block)
-    // SFB needs 2 columns (one per 32-col N-block, N=64)
-    uint32_t tmem_sfa = tmem_d + MMA_N;           // column 64
-    uint32_t tmem_sfb = tmem_d + MMA_N + 4;       // column 68
+
+    tmem_d = *reinterpret_cast<uint32_t*>(smem);
+    tmem_sfa = tmem_d + MMA_N;
+    tmem_sfb = tmem_d + MMA_N + 4;
 
     DEBUG_PRINT("[INIT] smem_base=0x%x, tmem_d=0x%x, tmem_sfa=0x%x, tmem_sfb=0x%x\\n",
                 smem_base, tmem_d, tmem_sfa, tmem_sfb);
 
-
-    // =========================================================================
-    // MBARRIER INIT
-    // =========================================================================
     if (threadIdx.x == 0) {
         asm volatile("mbarrier.init.shared::cta.b64 [%0], %1;\\n"
             :: "r"(mbar_smem), "r"(1) : "memory");
     }
     __syncthreads();
+}
 
+// ----------------------------------------------------------------------------
+// SMEM LOAD A
+// ----------------------------------------------------------------------------
+__device__ __forceinline__ void load_a_to_smem(
+    const Gemm_params& params, int m_block, int k_offset, uint8_t* a_smem)
+{
+    const uint8_t* a_global = reinterpret_cast<const uint8_t*>(params.a_ptr)
+                              + m_block * params.a_row_stride + k_offset / 2;
 
-    // =========================================================================
-    // INSTRUCTION DESCRIPTOR
-    // =========================================================================
-    uint32_t idesc = make_mxf4_idesc(MMA_M, MMA_N);
-    DEBUG_PRINT("[INIT] idesc=0x%08x\\n", idesc);
+    for (int i = threadIdx.x; i < MMA_M * MMA_K / 2; i += blockDim.x) {
+        int m = i / (MMA_K / 2);
+        int k_byte = i % (MMA_K / 2);
+        uint8_t val = a_global[m * params.a_row_stride + k_byte];
+        int block_row = m / 8;
+        int inner_row = m % 8;
+        int k_group = k_byte / 16;
+        int k_inner = k_byte % 16;
+        int smem_offset = inner_row * 16 + k_group * 128 + block_row * 256 + k_inner;
+        a_smem[smem_offset] = val;
+    }
+}
 
+// ----------------------------------------------------------------------------
+// SMEM LOAD B
+// ----------------------------------------------------------------------------
+__device__ __forceinline__ void load_b_to_smem(
+    const Gemm_params& params, int n_block, int k_offset, uint8_t* b_smem)
+{
+    const uint8_t* b_global = reinterpret_cast<const uint8_t*>(params.b_ptr)
+                              + n_block * params.b_row_stride + k_offset / 2;
 
-    // =========================================================================
-    // K-LOOP
-    // =========================================================================
-    const int num_k_tiles = params.K / MMA_K;
-    int mbar_phase = 0;
-    DEBUG_PRINT("[INIT] num_k_tiles=%d\\n", num_k_tiles);
+    for (int i = threadIdx.x; i < MMA_N * MMA_K / 2; i += blockDim.x) {
+        int n = i / (MMA_K / 2);
+        int k_byte = i % (MMA_K / 2);
+        uint8_t val = b_global[n * params.b_row_stride + k_byte];
+        int block_row = n / 8;
+        int inner_row = n % 8;
+        int k_group = k_byte / 16;
+        int k_inner = k_byte % 16;
+        int smem_offset = inner_row * 16 + k_group * 128 + block_row * 256 + k_inner;
+        b_smem[smem_offset] = val;
+    }
+}
 
-    for (int k_tile = 0; k_tile < num_k_tiles; k_tile++) {
-        const int k_offset = k_tile * MMA_K;
+// ----------------------------------------------------------------------------
+// TMEM LOAD SCALE FACTORS
+// ----------------------------------------------------------------------------
+__device__ __forceinline__ void load_scales_to_tmem(
+    const Gemm_params& params, int m_block, int n_block, int k_offset,
+    uint32_t tmem_sfa, uint32_t tmem_sfb)
+{
+    const int lane_id = threadIdx.x % 32;
+    const int warp_id = threadIdx.x / 32;
+    const int global_lane = warp_id * 32 + lane_id;
+    const int sf_k_idx = k_offset / 16;
 
+    const uint8_t* sfa_global = reinterpret_cast<const uint8_t*>(params.sfa_ptr)
+                                + (m_block + global_lane) * params.sfa_row_stride + sf_k_idx;
+    uint32_t sfa_val = *reinterpret_cast<const uint32_t*>(sfa_global);
 
-        // =====================================================================
-        // LOAD A TILE TO SMEM (canonical K-major layout)
-        // tcgen05 expects data arranged as 8-row blocks with K split into T-groups
-        // T = 32 FP4 elements = 16 bytes
-        // Layout: 8 rows × 16 bytes, then next K-group, then next 8-row block
-        // =====================================================================
-        const uint8_t* a_global = reinterpret_cast<const uint8_t*>(params.a_ptr)
-                                  + m_block * params.a_row_stride + k_offset / 2;
-        uint8_t* a_smem = reinterpret_cast<uint8_t*>(tile_smem);
-
-        // Permute from row-major to canonical K-major layout
-        // Each thread handles multiple bytes
-        for (int i = threadIdx.x; i < MMA_M * MMA_K / 2; i += blockDim.x) {
-            int m = i / (MMA_K / 2);  // row index 0-127
-            int k_byte = i % (MMA_K / 2);  // byte within row 0-31
-
-            // Source: simple row-major
-            uint8_t val = a_global[m * params.a_row_stride + k_byte];
-
-            // Destination: canonical K-major layout
-            // block_row = m / 8, inner_row = m % 8
-            // k_group = k_byte / 16, k_inner = k_byte % 16
-            int block_row = m / 8;
-            int inner_row = m % 8;
-            int k_group = k_byte / 16;
-            int k_inner = k_byte % 16;
-
-            // Canonical offset = inner_row*16 + k_group*128 + block_row*256 + k_inner
-            int smem_offset = inner_row * 16 + k_group * 128 + block_row * 256 + k_inner;
-            a_smem[smem_offset] = val;
-        }
-
-
-        // =====================================================================
-        // LOAD B TILE TO SMEM (canonical K-major layout)
-        // Same layout transformation as A: 8-row blocks with K split into T-groups
-        // For B: N is along the "row" dimension for tcgen05.mma perspective
-        // =====================================================================
-        const uint8_t* b_global = reinterpret_cast<const uint8_t*>(params.b_ptr)
-                                  + n_block * params.b_row_stride + k_offset / 2;
-        uint8_t* b_smem = reinterpret_cast<uint8_t*>(tile_smem + MMA_M * MMA_K / 2);
-
-        // Permute from row-major to canonical K-major layout
-        for (int i = threadIdx.x; i < MMA_N * MMA_K / 2; i += blockDim.x) {
-            int n = i / (MMA_K / 2);  // N index 0-63
-            int k_byte = i % (MMA_K / 2);  // byte within row 0-31
-
-            // Source: simple row-major
-            uint8_t val = b_global[n * params.b_row_stride + k_byte];
-
-            // Destination: canonical K-major layout
-            // block_row = n / 8, inner_row = n % 8
-            // k_group = k_byte / 16, k_inner = k_byte % 16
-            int block_row = n / 8;
-            int inner_row = n % 8;
-            int k_group = k_byte / 16;
-            int k_inner = k_byte % 16;
-
-            // Canonical offset = inner_row*16 + k_group*128 + block_row*256 + k_inner
-            int smem_offset = inner_row * 16 + k_group * 128 + block_row * 256 + k_inner;
-            b_smem[smem_offset] = val;
-        }
-
-
-        __syncthreads();
-
-        // =====================================================================
-        // BUILD SMEM DESCRIPTORS (for A and B matrices)
-        // =====================================================================
-        uint64_t a_desc = make_smem_desc(a_smem, 128, 256, 0);
-        uint64_t b_desc = make_smem_desc(b_smem, 128, 256, 0);
-
-
-        // =====================================================================
-        // LOAD SCALE FACTORS: GMEM -> Registers -> TMEM (direct, skip SMEM)
-        // Per f233.txt/f242.txt: each 32-row block uses lanes 0-31 in separate columns
-        // =====================================================================
-        const int lane_id = threadIdx.x % 32;
-        const int warp_id = threadIdx.x / 32;
-        const int global_lane = warp_id * 32 + lane_id;  // 0-127 across all threads
-
-        const int sf_k_idx = k_offset / 16;  // 4 scale factors per 64 K elements
-
-        // SFA: 128 rows, each thread loads its row's 4 scale bytes as uint32
-        const uint8_t* sfa_global = reinterpret_cast<const uint8_t*>(params.sfa_ptr)
-                                    + (m_block + global_lane) * params.sfa_row_stride + sf_k_idx;
-        uint32_t sfa_val = *reinterpret_cast<const uint32_t*>(sfa_global);
-
-        // SFB: 64 rows, warps 2-3 (global_lane >= 64) get zeros
-        uint32_t sfb_val = 0;
-        if (global_lane < MMA_N) {
-            const uint8_t* sfb_global = reinterpret_cast<const uint8_t*>(params.sfb_ptr)
-                                        + (n_block + global_lane) * params.sfb_row_stride + sf_k_idx;
-            sfb_val = *reinterpret_cast<const uint32_t*>(sfb_global);
-        }
-
-        // Store to TMEM - each warp stores to a different column
-        // Address format: bits [31:16]=lane, bits [15:0]=column
-        // All warps use lanes 0-31 (implicit from thread's lane_id), different columns
-        uint32_t sf_col_offset = warp_id;
-
-
-        asm volatile(
-            "tcgen05.st.sync.aligned.32x32b.x1.b32 [%0], {%1};\\n"
-            :: "r"(tmem_sfa + sf_col_offset), "r"(sfa_val) : "memory"
-        );
-        asm volatile(
-            "tcgen05.st.sync.aligned.32x32b.x1.b32 [%0], {%1};\\n"
-            :: "r"(tmem_sfb + sf_col_offset), "r"(sfb_val) : "memory"
-        );
-
-        // Wait for stores to complete
-        asm volatile("tcgen05.wait::st.sync.aligned;\\n" ::: "memory");
-
-
-        // =====================================================================
-        // ISSUE MMA
-        // =====================================================================
-        uint32_t enable_d = (k_tile > 0) ? 1 : 0;
-
-        if (threadIdx.x == 0) {
-            asm volatile(
-                "{\\n"
-                ".reg .pred p;\\n"
-                "setp.ne.u32 p, %6, 0;\\n"
-                "tcgen05.mma.cta_group::1.kind::mxf4nvf4.block_scale.scale_vec::4X\\n"
-                "    [%0], %1, %2, %3, [%4], [%5], p;\\n"
-                "}\\n"
-                :: "r"(tmem_d), "l"(a_desc), "l"(b_desc), "r"(idesc),
-                   "r"(tmem_sfa), "r"(tmem_sfb), "r"(enable_d) : "memory"
-            );
-            // Commit MMA
-            asm volatile(
-                "tcgen05.commit.cta_group::1.mbarrier::arrive::one.b64 [%0];\\n"
-                :: "r"(mbar_smem) : "memory"
-            );
-        }
-
-        // Wait for MMA to complete
-        uint32_t mma_done = 0;
-        while (!mma_done) {
-            asm volatile(
-                "{.reg .pred p; mbarrier.try_wait.parity.shared::cta.b64 p, [%1], %2; selp.u32 %0, 1, 0, p;}\\n"
-                : "=r"(mma_done) : "r"(mbar_smem), "r"(mbar_phase) : "memory"
-            );
-        }
-        mbar_phase ^= 1;
-
-        __syncthreads();
+    uint32_t sfb_val = 0;
+    if (global_lane < MMA_N) {
+        const uint8_t* sfb_global = reinterpret_cast<const uint8_t*>(params.sfb_ptr)
+                                    + (n_block + global_lane) * params.sfb_row_stride + sf_k_idx;
+        sfb_val = *reinterpret_cast<const uint32_t*>(sfb_global);
     }
 
+    uint32_t sf_col_offset = warp_id;
 
-    // =========================================================================
-    // LOAD RESULTS FROM TMEM TO REGISTERS
-    // =========================================================================
-    // Need fence before loads since MMA was issued by thread 0 but all threads read
+    asm volatile(
+        "tcgen05.st.sync.aligned.32x32b.x1.b32 [%0], {%1};\\n"
+        :: "r"(tmem_sfa + sf_col_offset), "r"(sfa_val) : "memory"
+    );
+    asm volatile(
+        "tcgen05.st.sync.aligned.32x32b.x1.b32 [%0], {%1};\\n"
+        :: "r"(tmem_sfb + sf_col_offset), "r"(sfb_val) : "memory"
+    );
+    asm volatile("tcgen05.wait::st.sync.aligned;\\n" ::: "memory");
+}
+
+// ----------------------------------------------------------------------------
+// MAIN COMPUTE (MMA)
+// ----------------------------------------------------------------------------
+__device__ __forceinline__ void issue_mma(
+    uint32_t tmem_d, uint64_t a_desc, uint64_t b_desc, uint32_t idesc,
+    uint32_t tmem_sfa, uint32_t tmem_sfb, uint32_t mbar_smem, int k_tile)
+{
+    uint32_t enable_d = (k_tile > 0) ? 1 : 0;
+
+    if (threadIdx.x == 0) {
+        asm volatile(
+            "{\\n"
+            ".reg .pred p;\\n"
+            "setp.ne.u32 p, %6, 0;\\n"
+            "tcgen05.mma.cta_group::1.kind::mxf4nvf4.block_scale.scale_vec::4X\\n"
+            "    [%0], %1, %2, %3, [%4], [%5], p;\\n"
+            "}\\n"
+            :: "r"(tmem_d), "l"(a_desc), "l"(b_desc), "r"(idesc),
+               "r"(tmem_sfa), "r"(tmem_sfb), "r"(enable_d) : "memory"
+        );
+        asm volatile(
+            "tcgen05.commit.cta_group::1.mbarrier::arrive::one.b64 [%0];\\n"
+            :: "r"(mbar_smem) : "memory"
+        );
+    }
+}
+
+__device__ __forceinline__ void wait_mma(uint32_t mbar_smem, int& mbar_phase)
+{
+    uint32_t mma_done = 0;
+    while (!mma_done) {
+        asm volatile(
+            "{.reg .pred p; mbarrier.try_wait.parity.shared::cta.b64 p, [%1], %2; selp.u32 %0, 1, 0, p;}\\n"
+            : "=r"(mma_done) : "r"(mbar_smem), "r"(mbar_phase) : "memory"
+        );
+    }
+    mbar_phase ^= 1;
+}
+
+// ----------------------------------------------------------------------------
+// ACCUMULATOR LOAD + STORE
+// ----------------------------------------------------------------------------
+__device__ __forceinline__ void load_accum_and_store(
+    const Gemm_params& params, int m_block, int n_block, uint32_t tmem_d)
+{
     asm volatile("tcgen05.fence::after_thread_sync;\\n" ::: "memory");
 
     const int lane_id = threadIdx.x % 32;
     const int warp_id = threadIdx.x / 32;
     const int out_m = warp_id * 32 + lane_id;
-
-    // Layout D for M=128 + cta_group::1 uses 4x1 organization (per f211.txt/f212.txt)
-    // Address format: bits [31:16] = lane offset, bits [15:0] = column
-    // Per f212.txt:
-    //   M0-31:   0x0000.0XXX -> lane offset 0,  columns 0-N
-    //   M32-63:  0x0020.0XXX -> lane offset 32, columns 0-N
-    //   M64-95:  0x0040.0XXX -> lane offset 64, columns 0-N
-    //   M96-127: 0x0060.0XXX -> lane offset 96, columns 0-N
-    // All warps read from same columns (0 to N-1), but different lane partitions
-    uint32_t lane_offset = warp_id * 32;  // 0, 32, 64, 96 for warps 0-3
+    uint32_t lane_offset = warp_id * 32;
 
     float acc_regs[MMA_N];
 
@@ -364,15 +280,9 @@ gemm_kernel_tcgen05(const __grid_constant__ Gemm_params params)
 
     asm volatile("tcgen05.wait::ld.sync.aligned;\\n" ::: "memory");
 
-    // Debug: print D values for lane 0 (M=0 for warp 0) across N
-    if (blockIdx.x == 0 && blockIdx.y == 0 && lane_id == 0 && warp_id == 0) {
-        printf("[D] M0: n0=%.2f n31=%.2f n32=%.2f n63=%.2f\\n",
-               acc_regs[0], acc_regs[31], acc_regs[32], acc_regs[63]);
-    }
+    DEBUG_PRINT("[D] M0: n0=%.2f n31=%.2f n32=%.2f n63=%.2f\\n",
+                acc_regs[0], acc_regs[31], acc_regs[32], acc_regs[63]);
 
-    // =========================================================================
-    // STORE RESULTS TO GLOBAL MEMORY
-    // =========================================================================
     if (m_block + out_m < params.M) {
         #pragma unroll
         for (int n = 0; n < MMA_N; n++) {
@@ -382,11 +292,10 @@ gemm_kernel_tcgen05(const __grid_constant__ Gemm_params params)
             }
         }
     }
+}
 
-
-    // =========================================================================
-    // TMEM DEALLOCATION
-    // =========================================================================
+__device__ __forceinline__ void dealloc_tmem(uint32_t tmem_d)
+{
     if (threadIdx.x < 32) {
         asm volatile(
             "tcgen05.dealloc.cta_group::1.sync.aligned.b32 %0, %1;\\n"
@@ -396,9 +305,68 @@ gemm_kernel_tcgen05(const __grid_constant__ Gemm_params params)
     __syncthreads();
 }
 
-// ============================================================================
-// Host Launcher
-// ============================================================================
+// ----------------------------------------------------------------------------
+// MAIN KERNEL
+// ----------------------------------------------------------------------------
+__global__ void __launch_bounds__(WARPS_PER_CTA * THREADS_PER_WARP)
+gemm_kernel_tcgen05(const __grid_constant__ Gemm_params params)
+{
+    // --- SHARED MEMORY SETUP ---
+    __shared__ char smem[SMEM_TOTAL];
+    char* tile_smem = smem + SMEM_OFF_TILES;
+    const uint32_t smem_base = __cvta_generic_to_shared(smem);
+    const uint32_t mbar_smem = smem_base + SMEM_OFF_MBAR;
+
+    const int m_block = blockIdx.y * MMA_M;
+    const int n_block = blockIdx.x * MMA_N;
+    if (m_block >= params.M || n_block >= params.N) return;
+
+    // --- INIT ---
+    uint32_t tmem_d, tmem_sfa, tmem_sfb;
+    init_tmem_and_mbar(smem, smem_base, mbar_smem, tmem_d, tmem_sfa, tmem_sfb);
+
+    uint32_t idesc = make_mxf4_idesc(MMA_M, MMA_N);
+    DEBUG_PRINT("[INIT] idesc=0x%08x\\n", idesc);
+
+    // --- K-LOOP ---
+    const int num_k_tiles = params.K / MMA_K;
+    int mbar_phase = 0;
+    DEBUG_PRINT("[INIT] num_k_tiles=%d\\n", num_k_tiles);
+
+    for (int k_tile = 0; k_tile < num_k_tiles; k_tile++) {
+        const int k_offset = k_tile * MMA_K;
+
+        // --- SMEM LOAD A ---
+        uint8_t* a_smem = reinterpret_cast<uint8_t*>(tile_smem);
+        load_a_to_smem(params, m_block, k_offset, a_smem);
+
+        // --- SMEM LOAD B ---
+        uint8_t* b_smem = reinterpret_cast<uint8_t*>(tile_smem + MMA_M * MMA_K / 2);
+        load_b_to_smem(params, n_block, k_offset, b_smem);
+
+        __syncthreads();
+
+        // --- BUILD DESCRIPTORS ---
+        uint64_t a_desc = make_smem_desc(a_smem, 128, 256, 0);
+        uint64_t b_desc = make_smem_desc(b_smem, 128, 256, 0);
+
+        // --- TMEM LOAD SCALE FACTORS ---
+        load_scales_to_tmem(params, m_block, n_block, k_offset, tmem_sfa, tmem_sfb);
+
+        // --- MAIN COMPUTE ---
+        issue_mma(tmem_d, a_desc, b_desc, idesc, tmem_sfa, tmem_sfb, mbar_smem, k_tile);
+        wait_mma(mbar_smem, mbar_phase);
+
+        __syncthreads();
+    }
+
+    // --- ACCUMULATOR LOAD + STORE ---
+    load_accum_and_store(params, m_block, n_block, tmem_d);
+
+    // --- TMEM DEALLOC ---
+    dealloc_tmem(tmem_d);
+}
+
 torch::Tensor cuda_nvfp4_gemm_tcgen05(
     torch::Tensor A, torch::Tensor B,
     torch::Tensor SFA, torch::Tensor SFB,
