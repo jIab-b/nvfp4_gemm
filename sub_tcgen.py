@@ -64,14 +64,7 @@ struct Gemm_params {
     int debug_block_y;
 };
 
-#define DEBUG_PRINT(fmt, ...) \\
-    do { \\
-        if (blockIdx.x == params.debug_block_x && \\
-            blockIdx.y == params.debug_block_y && \\
-            threadIdx.x == 0) { \\
-            printf(fmt, ##__VA_ARGS__); \\
-        } \\
-    } while(0)
+#define DEBUG_PRINT(fmt, ...) do {} while(0)
 
 // ============================================================================
 // Descriptor Helpers
@@ -173,30 +166,66 @@ gemm_kernel_tcgen05(const __grid_constant__ Gemm_params params)
 
 
         // =====================================================================
-        // LOAD A TILE TO SMEM
+        // LOAD A TILE TO SMEM (canonical K-major layout)
+        // tcgen05 expects data arranged as 8-row blocks with K split into T-groups
+        // T = 32 FP4 elements = 16 bytes
+        // Layout: 8 rows × 16 bytes, then next K-group, then next 8-row block
         // =====================================================================
         const uint8_t* a_global = reinterpret_cast<const uint8_t*>(params.a_ptr)
                                   + m_block * params.a_row_stride + k_offset / 2;
         uint8_t* a_smem = reinterpret_cast<uint8_t*>(tile_smem);
 
+        // Permute from row-major to canonical K-major layout
+        // Each thread handles multiple bytes
         for (int i = threadIdx.x; i < MMA_M * MMA_K / 2; i += blockDim.x) {
-            int m = i / (MMA_K / 2);
-            int k = i % (MMA_K / 2);
-            a_smem[m * (MMA_K / 2) + k] = a_global[m * params.a_row_stride + k];
+            int m = i / (MMA_K / 2);  // row index 0-127
+            int k_byte = i % (MMA_K / 2);  // byte within row 0-31
+
+            // Source: simple row-major
+            uint8_t val = a_global[m * params.a_row_stride + k_byte];
+
+            // Destination: canonical K-major layout
+            // block_row = m / 8, inner_row = m % 8
+            // k_group = k_byte / 16, k_inner = k_byte % 16
+            int block_row = m / 8;
+            int inner_row = m % 8;
+            int k_group = k_byte / 16;
+            int k_inner = k_byte % 16;
+
+            // Canonical offset = inner_row*16 + k_group*128 + block_row*256 + k_inner
+            int smem_offset = inner_row * 16 + k_group * 128 + block_row * 256 + k_inner;
+            a_smem[smem_offset] = val;
         }
 
 
         // =====================================================================
-        // LOAD B TILE TO SMEM
+        // LOAD B TILE TO SMEM (canonical K-major layout)
+        // Same layout transformation as A: 8-row blocks with K split into T-groups
+        // For B: N is along the "row" dimension for tcgen05.mma perspective
         // =====================================================================
         const uint8_t* b_global = reinterpret_cast<const uint8_t*>(params.b_ptr)
                                   + n_block * params.b_row_stride + k_offset / 2;
         uint8_t* b_smem = reinterpret_cast<uint8_t*>(tile_smem + MMA_M * MMA_K / 2);
 
+        // Permute from row-major to canonical K-major layout
         for (int i = threadIdx.x; i < MMA_N * MMA_K / 2; i += blockDim.x) {
-            int n = i / (MMA_K / 2);
-            int k = i % (MMA_K / 2);
-            b_smem[n * (MMA_K / 2) + k] = b_global[n * params.b_row_stride + k];
+            int n = i / (MMA_K / 2);  // N index 0-63
+            int k_byte = i % (MMA_K / 2);  // byte within row 0-31
+
+            // Source: simple row-major
+            uint8_t val = b_global[n * params.b_row_stride + k_byte];
+
+            // Destination: canonical K-major layout
+            // block_row = n / 8, inner_row = n % 8
+            // k_group = k_byte / 16, k_inner = k_byte % 16
+            int block_row = n / 8;
+            int inner_row = n % 8;
+            int k_group = k_byte / 16;
+            int k_inner = k_byte % 16;
+
+            // Canonical offset = inner_row*16 + k_group*128 + block_row*256 + k_inner
+            int smem_offset = inner_row * 16 + k_group * 128 + block_row * 256 + k_inner;
+            b_smem[smem_offset] = val;
         }
 
 
@@ -235,9 +264,13 @@ gemm_kernel_tcgen05(const __grid_constant__ Gemm_params params)
 
         // =====================================================================
         // BUILD SMEM DESCRIPTORS (for A and B matrices only)
+        // Canonical K-major no-swizzle layout for FP4:
+        // T = 32 elements = 16 bytes
+        // LBO = stride between K-groups = 8 rows × 16 bytes = 128 bytes
+        // SBO = stride between 8-row blocks = 2 K-groups × 128 bytes = 256 bytes
         // =====================================================================
-        uint64_t a_desc = make_smem_desc(a_smem, MMA_K / 2, MMA_K / 2, 0);
-        uint64_t b_desc = make_smem_desc(b_smem, MMA_K / 2, MMA_K / 2, 0);
+        uint64_t a_desc = make_smem_desc(a_smem, 128, 256, 0);
+        uint64_t b_desc = make_smem_desc(b_smem, 128, 256, 0);
 
         if (k_tile == 0) {
             DEBUG_PRINT("[K0] a_desc=0x%016llx, b_desc=0x%016llx\\n",
@@ -265,16 +298,18 @@ gemm_kernel_tcgen05(const __grid_constant__ Gemm_params params)
             DEBUG_PRINT("[K0] Before tcgen05.st SFA: tmem_sfa=0x%x, sfa_val=0x%x\\n", tmem_sfa, sfa_val);
         }
 
-        // Store SFA to TMEM - all warps participate, each stores to its 32 lanes
+        // Store SFA to TMEM - each warp stores to its own 32-lane range
+        // TMEM addr format: [31:16]=lane, [15:0]=column
+        uint32_t lane_offset = warp_id << 21;  // (warp_id * 32) << 16
         asm volatile(
             "tcgen05.st.sync.aligned.32x32b.x1.b32 [%0], {%1};\\n"
-            :: "r"(tmem_sfa), "r"(sfa_val) : "memory"
+            :: "r"(tmem_sfa + lane_offset), "r"(sfa_val) : "memory"
         );
 
         // Store SFB to TMEM (no DEBUG_PRINT between - causes divergence issues)
         asm volatile(
             "tcgen05.st.sync.aligned.32x32b.x1.b32 [%0], {%1};\\n"
-            :: "r"(tmem_sfb), "r"(sfb_val) : "memory"
+            :: "r"(tmem_sfb + lane_offset), "r"(sfb_val) : "memory"
         );
 
         // Wait for stores to complete before MMA
@@ -355,11 +390,14 @@ gemm_kernel_tcgen05(const __grid_constant__ Gemm_params params)
     const int warp_id = threadIdx.x / 32;
     const int out_m = warp_id * 32 + lane_id;
 
+    // Each warp reads from its own 32-lane range
+    uint32_t lane_offset = warp_id << 21;  // (warp_id * 32) << 16
+
     float acc_regs[MMA_N];
 
     #pragma unroll
     for (int n_chunk = 0; n_chunk < MMA_N; n_chunk += 8) {
-        uint32_t taddr = tmem_d + n_chunk;
+        uint32_t taddr = tmem_d + lane_offset + n_chunk;
         uint32_t r[8];
         asm volatile(
             "tcgen05.ld.sync.aligned.32x32b.x8.b32 {%0,%1,%2,%3,%4,%5,%6,%7}, [%8];\\n"
