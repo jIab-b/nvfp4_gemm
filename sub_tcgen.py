@@ -338,28 +338,6 @@ gemm_kernel_tcgen05(const __grid_constant__ Gemm_params params)
 
         __syncthreads();
 
-        // --- DEBUG: print raw A/B data for first k_tile ---
-        if (blockIdx.x == 0 && blockIdx.y == 0 && threadIdx.x == 0 && k_tile == 0) {
-            const uint8_t* a_raw = reinterpret_cast<const uint8_t*>(params.a_ptr);
-            const uint8_t* b_raw = reinterpret_cast<const uint8_t*>(params.b_ptr);
-            const uint16_t* sfa_raw = reinterpret_cast<const uint16_t*>(params.sfa_ptr);
-            const uint16_t* sfb_raw = reinterpret_cast<const uint16_t*>(params.sfb_ptr);
-            for (int iter = 0; iter < 4; iter++) {
-                int byte_off = iter * 16;
-                uint64_t a0 = *reinterpret_cast<const uint64_t*>(a_raw + byte_off);
-                uint64_t a1 = *reinterpret_cast<const uint64_t*>(a_raw + byte_off + 8);
-                uint16_t sfa = sfa_raw[iter];
-                printf("[TCGEN] iter=%d A row0: %016llx %016llx  SFA: %04x\\n", iter, a0, a1, sfa);
-            }
-            for (int iter = 0; iter < 4; iter++) {
-                int byte_off = iter * 16;
-                uint64_t b0 = *reinterpret_cast<const uint64_t*>(b_raw + byte_off);
-                uint64_t b1 = *reinterpret_cast<const uint64_t*>(b_raw + byte_off + 8);
-                uint16_t sfb = sfb_raw[iter];
-                printf("[TCGEN] iter=%d B col0: %016llx %016llx  SFB: %04x\\n", iter, b0, b1, sfb);
-            }
-        }
-
         // --- BUILD DESCRIPTORS ---
         uint64_t a_desc = make_smem_desc(a_smem, 128, 256, 0);
         uint64_t b_desc = make_smem_desc(b_smem, 128, 256, 0);
