@@ -1,5 +1,5 @@
 "**NVIDIA on GitHub ✅ success**
-> Workflow [19998935177](<https://github.com/gpu-mode/discord-cluster-manager/actions/runs/19998935177>) completed
+> Workflow [19999246429](<https://github.com/gpu-mode/discord-cluster-manager/actions/runs/19999246429>) completed
 > Downloading artifacts... done
 > ❌ Benchmarking failed
 
@@ -15,13 +15,13 @@ Running on:
 ```
 ❌ k: 16384; l: 1; m: 128; n: 7168; seed: 1111 failed testing:
 
-mismatch found! custom implementation doesn't match reference: Number of mismatched elements: 802692 ERROR AT (0, 32, 0): -1458.0 -2448.0 ERROR AT (0, 33, 0): 7136.0 5484.0 ERROR AT (0, 34, 0): -4708.0 908.0 ERROR AT (0, 35, 0): -1658.0 -645.5 ERROR AT (0, 36, 0): 945.5 -389.5 ... and 802687 more mismatched elements.
+mismatch found! custom implementation doesn't match reference: Number of mismatched elements: 802688 ERROR AT (0, 32, 0): -1458.0 -2448.0 ERROR AT (0, 33, 0): 7136.0 5484.0 ERROR AT (0, 34, 0): -4708.0 908.0 ERROR AT (0, 35, 0): -1658.0 -645.5 ERROR AT (0, 36, 0): 945.5 -389.5 ... and 802683 more mismatched elements.
 
 ❌ k: 7168; l: 1; m: 128; n: 4096; seed: 1111 failed testing:
 
-mismatch found! custom implementation doesn't match reference: Number of mismatched elements: 458666 ERROR AT (0, 32, 0): 124.25 1750.0 ERROR AT (0, 33, 0): -1312.0 -817.0 ERROR AT (0, 34, 0): 6300.0 2740.0 ERROR AT (0, 35, 0): 1538.0 1592.0 ERROR AT (0, 36, 0): -2766.0 -2518.0 ... and 458661 more mismatched elements.
+mismatch found! custom implementation doesn't match reference: Number of mismatched elements: 458665 ERROR AT (0, 32, 0): 124.25 1750.0 ERROR AT (0, 33, 0): -1312.0 -817.0 ERROR AT (0, 34, 0): 6300.0 2740.0 ERROR AT (0, 35, 0): 1538.0 1592.0 ERROR AT (0, 36, 0): -2766.0 -2518.0 ... and 458660 more mismatched elements.
 
 ❌ k: 2048; l: 1; m: 128; n: 7168; seed: 1111 failed testing:
 
-mismatch found! custom implementation doesn't match reference: Number of mismatched elements: 802671 ERROR AT (0, 32, 0): 3220.0 965.5 ERROR AT (0, 33, 0): 692.0 1426.0 ERROR AT (0, 34, 0): 628.0 1757.0 ERROR AT (0, 35, 0): -582.5 -1148.0 ERROR AT (0, 36, 0): 1289.0 -361.0 ... and 802666 more mismatched elements.
+mismatch found! custom implementation doesn't match reference: Number of mismatched elements: 802669 ERROR AT (0, 32, 0): 3078.0 965.5 ERROR AT (0, 33, 0): -158.0 1426.0 ERROR AT (0, 34, 0): 2760.0 1757.0 ERROR AT (0, 35, 0): -2952.0 -1148.0 ERROR AT (0, 36, 0): 957.0 -361.0 ... and 802664 more mismatched elements.
 ```"

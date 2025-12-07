@@ -45,12 +45,11 @@ static constexpr int SF_ROW_STRIDE = 16;  // 16-byte aligned for descriptors
 #define SMEM_MBAR        8                                    // uint64_t mbarrier (8-byte aligned)
 #define SMEM_A_TILE      (MMA_M * MMA_K / 2)                  // A tile: 128*64/2 = 4096 bytes
 #define SMEM_B_TILE      (MMA_N * MMA_K / 2)                  // B tile: 64*64/2 = 2048 bytes
-#define SMEM_SFA         (MMA_M * SF_ROW_STRIDE)              // SFA: 128*16 = 2048 bytes
-#define SMEM_SFB         (MMA_M * SF_ROW_STRIDE)              // SFB: padded to 128*16 = 2048 bytes (avoid warpx2 multicast)
+// Scale factors now loaded directly GMEM->RMEM->TMEM, no SMEM needed
 
 #define SMEM_OFF_MBAR    8                                    // mbar at offset 8 (8-byte aligned)
 #define SMEM_OFF_TILES   16                                   // tiles start after mbar
-#define SMEM_TOTAL       (SMEM_OFF_TILES + SMEM_A_TILE + SMEM_B_TILE + SMEM_SFA + SMEM_SFB)
+#define SMEM_TOTAL       (SMEM_OFF_TILES + SMEM_A_TILE + SMEM_B_TILE)
 
 struct Gemm_params {
     int M, N, K;
@@ -234,32 +233,6 @@ gemm_kernel_tcgen05(const __grid_constant__ Gemm_params params)
         }
 
 
-        // =====================================================================
-        // LOAD SCALE FACTORS TO SMEM (16-byte rows for descriptor compatibility)
-        // =====================================================================
-        const int sf_k_idx = k_offset / 16;  // 4 scale factors per 64 K elements
-        const uint8_t* sfa_global = reinterpret_cast<const uint8_t*>(params.sfa_ptr)
-                                    + m_block * params.sfa_row_stride + sf_k_idx;
-        const uint8_t* sfb_global = reinterpret_cast<const uint8_t*>(params.sfb_ptr)
-                                    + n_block * params.sfb_row_stride + sf_k_idx;
-
-        uint8_t* sfa_smem = reinterpret_cast<uint8_t*>(tile_smem + (MMA_M + MMA_N) * MMA_K / 2);
-        uint8_t* sfb_smem = sfa_smem + MMA_M * SF_ROW_STRIDE;
-
-        // Load SFA: 128 rows × 4 bytes, padded to 16-byte rows
-        for (int i = threadIdx.x; i < MMA_M * SF_ROW_STRIDE; i += blockDim.x) {
-            int m = i / SF_ROW_STRIDE;
-            int s = i % SF_ROW_STRIDE;
-            sfa_smem[i] = (s < 4) ? sfa_global[m * params.sfa_row_stride + s] : 0;
-        }
-
-        // Load SFB: 64 rows × 4 bytes, padded to 16-byte rows, then zero-pad to 128 rows
-        for (int i = threadIdx.x; i < MMA_M * SF_ROW_STRIDE; i += blockDim.x) {
-            int n = i / SF_ROW_STRIDE;
-            int s = i % SF_ROW_STRIDE;
-            sfb_smem[i] = (n < MMA_N && s < 4) ? sfb_global[n * params.sfb_row_stride + s] : 0;
-        }
-
         __syncthreads();
 
         // =====================================================================
@@ -269,20 +242,27 @@ gemm_kernel_tcgen05(const __grid_constant__ Gemm_params params)
         uint64_t b_desc = make_smem_desc(b_smem, 128, 256, 0);
 
         // =====================================================================
-        // STORE SCALE FACTORS: SMEM -> Registers -> TMEM (via tcgen05.st)
+        // LOAD SCALE FACTORS: GMEM -> Registers -> TMEM (direct, skip SMEM)
         // Per f233.txt/f242.txt: each 32-row block uses lanes 0-31 in separate columns
         // =====================================================================
         const int lane_id = threadIdx.x % 32;
         const int warp_id = threadIdx.x / 32;
-        const int global_lane = warp_id * 32 + lane_id;
+        const int global_lane = warp_id * 32 + lane_id;  // 0-127 across all threads
 
-        // Load SFA: 128 rows total, each warp handles 32 rows
-        uint32_t sfa_val = *reinterpret_cast<uint32_t*>(sfa_smem + global_lane * SF_ROW_STRIDE);
+        const int sf_k_idx = k_offset / 16;  // 4 scale factors per 64 K elements
 
-        // Load SFB: 64 rows total, warps 2-3 get zeros
-        uint32_t sfb_val = (global_lane < MMA_N)
-            ? *reinterpret_cast<uint32_t*>(sfb_smem + global_lane * SF_ROW_STRIDE)
-            : 0;
+        // SFA: 128 rows, each thread loads its row's 4 scale bytes as uint32
+        const uint8_t* sfa_global = reinterpret_cast<const uint8_t*>(params.sfa_ptr)
+                                    + (m_block + global_lane) * params.sfa_row_stride + sf_k_idx;
+        uint32_t sfa_val = *reinterpret_cast<const uint32_t*>(sfa_global);
+
+        // SFB: 64 rows, warps 2-3 (global_lane >= 64) get zeros
+        uint32_t sfb_val = 0;
+        if (global_lane < MMA_N) {
+            const uint8_t* sfb_global = reinterpret_cast<const uint8_t*>(params.sfb_ptr)
+                                        + (n_block + global_lane) * params.sfb_row_stride + sf_k_idx;
+            sfb_val = *reinterpret_cast<const uint32_t*>(sfb_global);
+        }
 
         // Store to TMEM - each warp stores to a different column
         // Address format: bits [31:16]=lane, bits [15:0]=column
