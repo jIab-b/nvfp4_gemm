@@ -1,5 +1,5 @@
 "**NVIDIA on GitHub ✅ success**
-> Workflow [20003196244](<https://github.com/gpu-mode/discord-cluster-manager/actions/runs/20003196244>) completed
+> Workflow [20003708449](<https://github.com/gpu-mode/discord-cluster-manager/actions/runs/20003708449>) completed
 > Downloading artifacts... done
 > ❌ Benchmarking failed
 
@@ -15,127 +15,13 @@ Running on:
 ```
 ❌ k: 16384; l: 1; m: 128; n: 7168; seed: 1111 failed testing:
 
-mismatch found! custom implementation doesn't match reference: Number of mismatched elements: 802098 ERROR AT (0, 32, 0): -910.0 -2448.0 ERROR AT (0, 33, 0): 8840.0 5484.0 ERROR AT (0, 34, 0): 1069.0 908.0 ERROR AT (0, 35, 0): -2404.0 -645.5 ERROR AT (0, 36, 0): 38.0 -389.5 ... and 802093 more mismatched elements.
+mismatch found! custom implementation doesn't match reference: Number of mismatched elements: 917355 ERROR AT (0, 0, 0): -2472.0 -2724.0 ERROR AT (0, 1, 0): -1524.0 -1902.0 ERROR AT (0, 2, 0): -4264.0 -3638.0 ERROR AT (0, 3, 0): -1838.0 133.0 ERROR AT (0, 4, 0): -1810.0 -2102.0 ... and 917350 more mismatched elements.
 
 ❌ k: 7168; l: 1; m: 128; n: 4096; seed: 1111 failed testing:
 
-mismatch found! custom implementation doesn't match reference: Number of mismatched elements: 458523 ERROR AT (0, 32, 0): 124.25 1750.0 ERROR AT (0, 33, 0): -1312.0 -817.0 ERROR AT (0, 34, 0): 6300.0 2740.0 ERROR AT (0, 35, 0): 1538.0 1592.0 ERROR AT (0, 36, 0): -2766.0 -2518.0 ... and 458518 more mismatched elements.
+mismatch found! custom implementation doesn't match reference: Number of mismatched elements: 524197 ERROR AT (0, 0, 0): 881.5 51.0 ERROR AT (0, 1, 0): -210.25 2352.0 ERROR AT (0, 2, 0): 949.0 1932.0 ERROR AT (0, 3, 0): 1278.0 1252.0 ERROR AT (0, 4, 0): -2552.0 -3704.0 ... and 524192 more mismatched elements.
 
 ❌ k: 2048; l: 1; m: 128; n: 7168; seed: 1111 failed testing:
 
-mismatch found! custom implementation doesn't match reference: Number of mismatched elements: 744426 ERROR AT (0, 32, 0): -781.0 965.5 ERROR AT (0, 33, 0): 2106.0 1426.0 ERROR AT (0, 34, 0): 1488.0 1757.0 ERROR AT (0, 35, 0): -524.0 -1148.0 ERROR AT (0, 36, 0): 465.75 -361.0 ... and 744421 more mismatched elements.
-```
-
-## Program stdout:
-```
-[TCGEN] iter=0 A row0: ed8590b354add4f6 2ea0c5a3d78b49bc  SFA: 4000
-[TCGEN] iter=1 A row0: 35cd1606690b2ed8 7d6c5f9936576960  SFA: 3800
-[TCGEN] iter=2 A row0: 66e876056306ee26 79664d59ada77efa  SFA: 0000
-[TCGEN] iter=3 A row0: 3e7fb7e41948e02c 1ee54c922db1f598  SFA: 3844
-[TCGEN] iter=0 B col0: e382635c0750f3ac f2b4956fdac4f06e  SFB: 4044
-[TCGEN] iter=1 B col0: ae6dcddc8c995b5b 41f9776d2c727ec4  SFB: 0040
-[TCGEN] iter=2 B col0: c3e8da513a0ba03b 222d74268026e620  SFB: 3840
-[TCGEN] iter=3 B col0: c7a2bc0f571120b3 118b637e1935d66c  SFB: 4400
-[TCGEN] iter=0 A row0: 4b96b33c2753f707 36c6779d3047f6ce  SFA: 4044
-[TCGEN] iter=1 A row0: d8916eb2b490cbb6 22afe008873c413a  SFA: 3838
-[TCGEN] iter=2 A row0: 21597314d71e2f53 832e28f6db9b60d9  SFA: 3838
-[TCGEN] iter=3 A row0: 476bb1a311eaa758 4765bc2a20273f6e  SFA: 0044
-[TCGEN] iter=0 B col0: dbc164d669b304fc b2a30e7477258532  SFB: 4040
-[TCGEN] iter=1 B col0: 0e495c153d89a1c5 8dff73e815148744  SFB: 0040
-[TCGEN] iter=2 B col0: ca8ec5718e13bb00 598acf3825e39dd1  SFB: 4444
-[TCGEN] iter=3 B col0: 1a74361388dbed06 0ae6832cc0509fc4  SFB: 3840
-[TCGEN] iter=0 A row0: 508a9a33ed03d110 300a45acc9c9ad85  SFA: 0038
-[TCGEN] iter=1 A row0: ac8fa005bead586f 89617397bd1e367c  SFA: 4038
-[TCGEN] iter=2 A row0: 95fbd964d8d8a077 f464402ca05c8cbc  SFA: 0038
-[TCGEN] iter=3 A row0: 5b2173d8f95d949e 0d6f27c760430232  SFA: 4038
-[TCGEN] iter=0 B col0: 11d020747fc3f5e5 9f30643c68a713b0  SFB: 3840
-[TCGEN] iter=1 B col0: 5918152e4e819847 2d19303d9e040be0  SFB: 4000
-[TCGEN] iter=2 B col0: 38acee97fac58944 79be1a0e310b9d78  SFB: 0040
-[TCGEN] iter=3 B col0: 48c032796054bef3 932bb103a7e3d042  SFB: 4000
-[TCGEN] iter=0 A row0: dfe5fd0bd9fd0b64 7c3ac64934d13e24  SFA: 3840
-[TCGEN] iter=1 A row0: 9e56983de5184271 17b552f2ecca5de6  SFA: 4440
-[TCGEN] iter=2 A row0: 3ecba0cd4fcc3dce 3146d792f348153f  SFA: 0000
-[TCGEN] iter=3 A row0: 9f8895dcd224120a 2a0b5d8cadba8839  SFA: 4040
-[TCGEN] iter=0 B col0: 347a0cb55d5b1a11 0426b666e5e93b0b  SFB: 4044
-[TCGEN] iter=1 B col0: 68abe06a6250fd33 412a00f027a414c6  SFB: 0040
-[TCGEN] iter=2 B col0: c7d6dd254c858544 bab01cb572ad0ef2  SFB: 4440
-[TCGEN] iter=3 B col0: e87fe25dbd55ec39 728ebf115e6ba015  SFB: 3840
-[TCGEN] iter=0 A row0: 0465c8dfad3511e2 755950bf29a71048  SFA: 0044
-[TCGEN] iter=1 A row0: 7222aa1532afeacb c29bc47112738603  SFA: 3838
-[TCGEN] iter=2 A row0: 21cfb1eee354a1d2 6f7758d223197c0e  SFA: 4438
-[TCGEN] iter=3 A row0: 4dd632ab4e62a351 00dda85888bac47c  SFA: 4444
-[TCGEN] iter=0 B col0: cc627efb88d505ae a42f297e3da09694  SFB: 3838
-[TCGEN] iter=1 B col0: cf7b0e83f0d4c76e 85c880746bbf65d4  SFB: 3844
-[TCGEN] iter=2 B col0: b21a98dff9b2848a 2eb8138e37f3dc0e  SFB: 3838
-[TCGEN] iter=3 B col0: 8eb5aee0f2c082e6 2861a842603c926e  SFB: 4044
-[TCGEN] iter=0 A row0: faaeffdb034ea950 25cfc2ee552dab60  SFA: 4444
-[TCGEN] iter=1 A row0: 6c6182025012dfc8 72f0043afcbdb236  SFA: 4440
-[TCGEN] iter=2 A row0: 0a7ac7c36d355423 2affc47d0069e76c  SFA: 4444
-[TCGEN] iter=3 A row0: 5d2902b0d2a07607 0fde1258d66728a6  SFA: 4038
-[TCGEN] iter=0 B col0: be67c8d69a09d2ec 17a0e6e07102dd28  SFB: 0000
-[TCGEN] iter=1 B col0: 687dd9b588ea75d7 73d03730785d980e  SFB: 4000
-[TCGEN] iter=2 B col0: b6d24912fad0fdcc 661cf66622e14e57  SFB: 0000
-[TCGEN] iter=3 B col0: 6046e58688ebd137 922bd668a543d0d5  SFB: 3800
-[TCGEN] iter=0 A row0: c0ac97c66213468f 6034fd16e5a517f3  SFA: 4440
-[TCGEN] iter=1 A row0: 9ec313bca9ac73ad 809507347f4f9bb2  SFA: 0044
-[TCGEN] iter=2 A row0: 681359fa5927a929 ac462219877fd1c0  SFA: 0000
-[TCGEN] iter=3 A row0: da31becec522d122 f4ed3096c28f1ee1  SFA: 4438
-[TCGEN] iter=0 B col0: f2b9fe550a986c9c 2f5a42f59df22e85  SFB: 4440
-[TCGEN] iter=1 B col0: f4d9dae4a5e5e7d8 cdfa61113c07eff6  SFB: 4400
-[TCGEN] iter=2 B col0: 63744ce036e1cafc 45bcae9faea06615  SFB: 3840
-[TCGEN] iter=3 B col0: 32faf7bf4fa176c1 c8981e4fba1e8580  SFB: 0044
-[TCGEN] iter=0 A row0: 991d3467b2c0d046 3c9bf0cdc295ef6a  SFA: 0040
-[TCGEN] iter=1 A row0: 3f476fcefa235e64 7450615cd233fdfd  SFA: 4038
-[TCGEN] iter=2 A row0: 335b4be03ffc3a28 cca9cace73483d4e  SFA: 0038
-[TCGEN] iter=3 A row0: e979a8a59bd13968 4db0714a96f29b32  SFA: 0044
-[TCGEN] iter=0 B col0: c0c6383fe5196bb9 4a15bc24e76b77bc  SFB: 4038
-[TCGEN] iter=1 B col0: 258a2c740ce05ea8 26d5e57f8286082d  SFB: 0000
-[TCGEN] iter=2 B col0: 5c9d747b7296c835 9494a9261c0110b5  SFB: 3838
-[TCGEN] iter=3 B col0: bb22f40893c2621b 032436d75ec5d7c5  SFB: 0040
-[TCGEN] iter=0 A row0: cbff20fbdd9bc55f d8e2451c205d1643  SFA: 4440
-[TCGEN] iter=1 A row0: 275da9cd33bb9adc 4614048720f69ab1  SFA: 4400
-[TCGEN] iter=2 A row0: 6757b6f1fbaa0612 26aa30d90d4edf67  SFA: 4438
-[TCGEN] iter=3 A row0: 2a239d22ee067da0 7c7398bb921b1a46  SFA: 0044
-[TCGEN] iter=0 B col0: f18aff9759d432e7 369a04202035adbd  SFB: 4440
-[TCGEN] iter=1 B col0: c9fb765b1acde9a5 ab2c869272d3d977  SFB: 4038
-[TCGEN] iter=2 B col0: d9f2494ff9791655 378405aab245a7e1  SFB: 4040
-[TCGEN] iter=3 B col0: 220428726c2f7a0f 534473b755a58c64  SFB: 4444
-[TCGEN] iter=0 A row0: 39cd370b9d42d3af feb97f1166d6fd61  SFA: 4000
-[TCGEN] iter=1 A row0: c8c869c7a5aa322a 16611eb1b7b8c6f6  SFA: 3800
-[TCGEN] iter=2 A row0: f264ace21e2093c5 2b0c670a6ede471e  SFA: 4400
-[TCGEN] iter=3 A row0: 3b13b1947ceee687 29d3b86b5e52c666  SFA: 0040
-[TCGEN] iter=0 B col0: 3a8708d8326fcd73 3793d33a56319b62  SFB: 3840
-[TCGEN] iter=1 B col0: 14ca205d3801e93e 0c3ce2209cf3935b  SFB: 4400
-[TCGEN] iter=2 B col0: 3c306807b16c711d 40bc93fc7752459f  SFB: 0000
-[TCGEN] iter=3 B col0: 5850cc4f1d268d23 3b62328e309cf685  SFB: 4044
-[TCGEN] iter=0 A row0: 034afae1463ddf73 6abad1163397ad8e  SFA: 4000
-[TCGEN] iter=1 A row0: 8a0334f2e0b671c8 8bc5fe843f60ab0b  SFA: 4400
-[TCGEN] iter=2 A row0: c08168967ef766ef 7c51bda595b3f535  SFA: 3840
-[TCGEN] iter=3 A row0: f4b6f4d256c2469b 18881b2296e826d1  SFA: 3840
-[TCGEN] iter=0 B col0: f803826a0f8e0644 c5ff941e003c203f  SFB: 0038
-[TCGEN] iter=1 B col0: 4be079045c766f20 feb84f337402d90f  SFB: 4444
-[TCGEN] iter=2 B col0: 92ca26a73faee225 d2a609ed8ff86b20  SFB: 4438
-[TCGEN] iter=3 B col0: 413d0e6954a958db a0c77c2918588a33  SFB: 0000
-[TCGEN] iter=0 A row0: 1d51fa3690bf6015 6c6fa8dcfb4a7ade  SFA: 0000
-[TCGEN] iter=1 A row0: e5e7076623b33de9 ce414f5416d85446  SFA: 0040
-[TCGEN] iter=2 A row0: d04f1a9e95e6e9c0 ba8ed4aa1e1ae54b  SFA: 3800
-[TCGEN] iter=3 A row0: a742d85d1809bca1 9a57b39de628e726  SFA: 0038
-[TCGEN] iter=0 B col0: d04cc6d641b10949 ab3f041101c08b0f  SFB: 3840
-[TCGEN] iter=1 B col0: 133bd4a5c60a5b0a 1d440e5b8cb50db2  SFB: 4040
-[TCGEN] iter=2 B col0: f571f0d9e073219b 92fafa839cb1b094  SFB: 0040
-[TCGEN] iter=3 B col0: 231edc16a9feafba e58b58d41a208c29  SFB: 3844
-[TCGEN] iter=0 A row0: 12a724869629ee7e cf6e61744b929d5f  SFA: 3838
-[TCGEN] iter=1 A row0: 134960e6ed246525 e05d10413d751778  SFA: 3844
-[TCGEN] iter=2 A row0: d0ec90cce7b0b19c 86320f2b172bdf46  SFA: 0000
-[TCGEN] iter=3 A row0: 05b6d0cbd486f148 cc1edd82bb8f13dc  SFA: 0040
-[TCGEN] iter=0 B col0: 9b022ad5f8175037 c71a5c5fc7e6b9e3  SFB: 3840
-[TCGEN] iter=1 B col0: 65a60bd82561960e 77a147768b180941  SFB: 0044
-[TCGEN] iter=2 B col0: d073068144335192 3479691639fef7a5  SFB: 4038
-[TCGEN] iter=3 B col0: 8954627286751905 2683055e59d1edd1  SFB: 4000
-[TCGEN] iter=0 A row0: 780859c29b03e66f e282b7570ed15fdf  SFA: 4438
-[TCGEN] iter=1 A row0: 906309e4ed0632c9 7985430f82a2a15c  SFA: 0000
-[TCGEN] iter=2 A row0: 952dd87ad8596696 7459bfa8b196f473  SFA: 4440
-[TCGEN] iter=3 A row0: 5945ba2341bb6251 d8ddda76ef4aac32  SFA: 3840
-[TCGEN] iter=0 B col0: a682844b0c92862e f327d5fb56c4f6e8  SFB: 4040
-[TCGEN] iter=1 B col0: 8aed5b86c3bd5861 9d3ec98831b450af  SFB: 0038
-[TCGEN] iter=2 B col0: bf1e8c9dcbed0d47 d9e4894ef1c284d9  SFB: 3800
+mismatch found! custom implementation doesn't match reference: Number of mismatched elements: 917342 ERROR AT (0, 0, 0): -2908.0 -1864.0 ERROR AT (0, 1, 0): 218.5 -1639.0 ERROR AT (0, 2, 0): 1422.0 1939.0 ERROR AT (0, 3, 0): 1245.0 658.0 ERROR AT (0, 4, 0): 1580.0 1111.0 ... and 917337 more mismatched elements.
+```"

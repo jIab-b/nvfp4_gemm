@@ -192,16 +192,23 @@ __device__ __forceinline__ void load_scales_to_tmem(
         sfb_val = *reinterpret_cast<const uint32_t*>(sfb_global);
     }
 
-    uint32_t sf_col_offset = warp_id;
+    // TMEM address format: bits 31-16 = lane, bits 15-0 = column
+    // Each warp stores to 32 consecutive lanes at the same column
+    uint32_t lane_base = warp_id * 32;
+    uint32_t tmem_addr_sfa = (lane_base << 16) | tmem_sfa;
+    uint32_t tmem_addr_sfb = (lane_base << 16) | tmem_sfb;
 
     asm volatile(
         "tcgen05.st.sync.aligned.32x32b.x1.b32 [%0], {%1};\\n"
-        :: "r"(tmem_sfa + sf_col_offset), "r"(sfa_val) : "memory"
+        :: "r"(tmem_addr_sfa), "r"(sfa_val) : "memory"
     );
-    asm volatile(
-        "tcgen05.st.sync.aligned.32x32b.x1.b32 [%0], {%1};\\n"
-        :: "r"(tmem_sfb + sf_col_offset), "r"(sfb_val) : "memory"
-    );
+    // Only first 2 warps (64 threads) store to SFB
+    if (warp_id < 2) {
+        asm volatile(
+            "tcgen05.st.sync.aligned.32x32b.x1.b32 [%0], {%1};\\n"
+            :: "r"(tmem_addr_sfb), "r"(sfb_val) : "memory"
+        );
+    }
     asm volatile("tcgen05.wait::st.sync.aligned;\\n" ::: "memory");
 }
 
