@@ -33,8 +33,9 @@ static constexpr int MMA_K = 64;
 static constexpr int WARPS_PER_CTA = 4;
 static constexpr int THREADS_PER_WARP = 32;
 // Layout D (4x1): D uses MMA_N columns (64), accessed via lane offsets for M-blocks
-// SFA needs 4 cols, SFB needs 2 cols (for N=64)
-// Total: 64 + 4 + 2 = 70, round to 128 (power of 2)
+// SFA needs 1 col (4 packed bytes per lane), SFB needs 2 cols (64 values in 32 lanes)
+// SFB is broadcast to all 4 lane partitions for accessibility
+// Total: 64 + 1 + 2 = 67 (with padding at 68-69), TMEM_COLS=128 is sufficient
 static constexpr int TMEM_COLS = 128;
 static constexpr int SF_ROW_STRIDE = 16;  // 16-byte aligned for descriptors
 
@@ -181,34 +182,49 @@ __device__ __forceinline__ void load_scales_to_tmem(
     const int global_lane = warp_id * 32 + lane_id;
     const int sf_k_idx = k_offset / 16;
 
+    // Load SFA - each thread loads scale for its M-row (128 total)
     const uint8_t* sfa_global = reinterpret_cast<const uint8_t*>(params.sfa_ptr)
                                 + (m_block + global_lane) * params.sfa_row_stride + sf_k_idx;
     uint32_t sfa_val = *reinterpret_cast<const uint32_t*>(sfa_global);
 
-    uint32_t sfb_val = 0;
-    if (global_lane < MMA_N) {
-        const uint8_t* sfb_global = reinterpret_cast<const uint8_t*>(params.sfb_ptr)
-                                    + (n_block + global_lane) * params.sfb_row_stride + sf_k_idx;
-        sfb_val = *reinterpret_cast<const uint32_t*>(sfb_global);
+    // Load SFB - each lane loads 2 values (SFB[lane] and SFB[lane+32])
+    // This will be broadcast to all 4 lane partitions
+    uint32_t sfb_val0 = 0, sfb_val1 = 0;
+    if (lane_id < MMA_N) {
+        const uint8_t* sfb_global0 = reinterpret_cast<const uint8_t*>(params.sfb_ptr)
+                                    + (n_block + lane_id) * params.sfb_row_stride + sf_k_idx;
+        sfb_val0 = *reinterpret_cast<const uint32_t*>(sfb_global0);
+    }
+    if (lane_id + 32 < MMA_N) {
+        const uint8_t* sfb_global1 = reinterpret_cast<const uint8_t*>(params.sfb_ptr)
+                                    + (n_block + lane_id + 32) * params.sfb_row_stride + sf_k_idx;
+        sfb_val1 = *reinterpret_cast<const uint32_t*>(sfb_global1);
     }
 
     // TMEM address format: bits 31-16 = lane, bits 15-0 = column
-    // Each warp stores to 32 consecutive lanes at the same column
     uint32_t lane_base = warp_id * 32;
     uint32_t tmem_addr_sfa = (lane_base << 16) | tmem_sfa;
-    uint32_t tmem_addr_sfb = (lane_base << 16) | tmem_sfb;
 
+    // Store SFA - each warp stores to its own lane partition
     asm volatile(
         "tcgen05.st.sync.aligned.32x32b.x1.b32 [%0], {%1};\\n"
         :: "r"(tmem_addr_sfa), "r"(sfa_val) : "memory"
     );
-    // Only first 2 warps (64 threads) store to SFB
-    if (warp_id < 2) {
-        asm volatile(
-            "tcgen05.st.sync.aligned.32x32b.x1.b32 [%0], {%1};\\n"
-            :: "r"(tmem_addr_sfb), "r"(sfb_val) : "memory"
-        );
-    }
+
+    // Store SFB - ALL warps store (broadcast to all 4 lane partitions)
+    // Use 2 columns: col0 = SFB[0..31], col1 = SFB[32..63]
+    uint32_t tmem_addr_sfb0 = (lane_base << 16) | tmem_sfb;
+    uint32_t tmem_addr_sfb1 = (lane_base << 16) | (tmem_sfb + 1);
+
+    asm volatile(
+        "tcgen05.st.sync.aligned.32x32b.x1.b32 [%0], {%1};\\n"
+        :: "r"(tmem_addr_sfb0), "r"(sfb_val0) : "memory"
+    );
+    asm volatile(
+        "tcgen05.st.sync.aligned.32x32b.x1.b32 [%0], {%1};\\n"
+        :: "r"(tmem_addr_sfb1), "r"(sfb_val1) : "memory"
+    );
+
     asm volatile("tcgen05.wait::st.sync.aligned;\\n" ::: "memory");
 }
 
