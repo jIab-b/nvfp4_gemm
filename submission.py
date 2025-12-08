@@ -727,6 +727,20 @@ def custom_kernel(data: input_t) -> output_t:
         Output tensor c with computed results
     """
     a, b, _, _, sfa_permuted, sfb_permuted, c = data
+
+    # Print permuted scale tensor shapes once for debugging
+    if not hasattr(custom_kernel, "_printed"):
+        sfa_strides = list(sfa_permuted.stride())
+        sfb_strides = list(sfb_permuted.stride())
+        print(
+            "perm info: "
+            f"sfa_perm shape={list(sfa_permuted.shape)} strides={sfa_strides} "
+            f"sfb_perm shape={list(sfb_permuted.shape)} strides={sfb_strides} "
+            f"A shape={list(a.shape)} stride={list(a.stride())} "
+            f"B shape={list(b.shape)} stride={list(b.stride())} "
+            f"K_effective={a.shape[1]*2}"
+        )
+        custom_kernel._printed = True
     
     # Ensure kernel is compiled (will use cached version if available)
     # To avoid the compilation overhead, we compile the kernel once and cache it.

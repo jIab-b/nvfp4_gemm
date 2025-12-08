@@ -179,43 +179,41 @@ __device__ __forceinline__ void load_scales_to_tmem(
 {
     const int lane_id = threadIdx.x % 32;
     const int warp_id = threadIdx.x / 32;
-    const int global_lane = warp_id * 32 + lane_id;
+    // sf_k_idx = which group of 4 scale factors (for scale_vec::4X with MMA_K=64)
+    // k_offset=0 -> sf_k_idx=0, k_offset=64 -> sf_k_idx=4, etc.
+    // Each group is 4 bytes, so byte offset = sf_k_idx (not sf_k_idx*4)
     const int sf_k_idx = k_offset / 16;
 
-    // Load SFA - each thread loads scale for its M-row (128 total)
-    const uint8_t* sfa_global = reinterpret_cast<const uint8_t*>(params.sfa_ptr)
-                                + (m_block + global_lane) * params.sfa_row_stride + sf_k_idx;
-    uint32_t sfa_val = *reinterpret_cast<const uint32_t*>(sfa_global);
-
-    // Load SFB - each lane loads 2 values (SFB[lane] and SFB[lane+32])
-    // This will be broadcast to all 4 lane partitions
-    uint32_t sfb_val0 = 0, sfb_val1 = 0;
-    if (lane_id < MMA_N) {
-        const uint8_t* sfb_global0 = reinterpret_cast<const uint8_t*>(params.sfb_ptr)
-                                    + (n_block + lane_id) * params.sfb_row_stride + sf_k_idx;
-        sfb_val0 = *reinterpret_cast<const uint32_t*>(sfb_global0);
-    }
-    if (lane_id + 32 < MMA_N) {
-        const uint8_t* sfb_global1 = reinterpret_cast<const uint8_t*>(params.sfb_ptr)
-                                    + (n_block + lane_id + 32) * params.sfb_row_stride + sf_k_idx;
-        sfb_val1 = *reinterpret_cast<const uint32_t*>(sfb_global1);
-    }
-
-    // TMEM address format: bits 31-16 = lane, bits 15-0 = column
+    // TMEM address format: bits[31:16] = lane base, bits[15:0] = column
     uint32_t lane_base = warp_id * 32;
-    uint32_t tmem_addr_sfa = (lane_base << 16) | tmem_sfa;
 
-    // Store SFA - each warp stores to its own lane partition
+    // === SFA: Each warp loads its 32 M-rows ===
+    // Warp 0 -> M-rows 0-31, Warp 1 -> M-rows 32-63, etc.
+    int m_row = m_block + warp_id * 32 + lane_id;
+
+    const uint8_t* sfa_base = reinterpret_cast<const uint8_t*>(params.sfa_ptr);
+    // Load 4 consecutive scale factors (4 bytes) for this M-row at k_offset
+    // sf_k_idx gives the byte offset within the row
+    uint32_t sfa_val = *reinterpret_cast<const uint32_t*>(
+        sfa_base + m_row * params.sfa_row_stride + sf_k_idx);
+
+    // Each warp writes to its own 32-lane partition
+    uint32_t tmem_addr_sfa = (lane_base << 16) | tmem_sfa;
     asm volatile(
         "tcgen05.st.sync.aligned.32x32b.x1.b32 [%0], {%1};\\n"
         :: "r"(tmem_addr_sfa), "r"(sfa_val) : "memory"
     );
 
-    // Store SFB - ALL warps store (broadcast to all 4 lane partitions)
-    // Use 2 columns: col0 = SFB[0..31], col1 = SFB[32..63]
+    // === SFB: All warps store same data (replication to all lane partitions) ===
+    const uint8_t* sfb_base = reinterpret_cast<const uint8_t*>(params.sfb_ptr);
+
+    uint32_t sfb_val0 = *reinterpret_cast<const uint32_t*>(
+        sfb_base + (n_block + lane_id) * params.sfb_row_stride + sf_k_idx);
+    uint32_t sfb_val1 = *reinterpret_cast<const uint32_t*>(
+        sfb_base + (n_block + lane_id + 32) * params.sfb_row_stride + sf_k_idx);
+
     uint32_t tmem_addr_sfb0 = (lane_base << 16) | tmem_sfb;
     uint32_t tmem_addr_sfb1 = (lane_base << 16) | (tmem_sfb + 1);
-
     asm volatile(
         "tcgen05.st.sync.aligned.32x32b.x1.b32 [%0], {%1};\\n"
         :: "r"(tmem_addr_sfb0), "r"(sfb_val0) : "memory"
