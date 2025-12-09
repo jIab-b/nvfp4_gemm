@@ -36,7 +36,7 @@ static constexpr int TMEM_COLS = 128;
 #define SMEM_A_TILE      (MMA_M * MMA_K / 2)
 #define SMEM_B_TILE      (MMA_N * MMA_K / 2)
 #define SMEM_OFF_MBAR    8
-#define SMEM_OFF_TILES   1024  // tile base on 1024B boundary so swizzle base-offset can stay 0
+#define SMEM_OFF_TILES   1024  // 1024B alignment covers swizzle boundaries
 #define SMEM_TOTAL       (SMEM_OFF_TILES + SMEM_A_TILE + SMEM_B_TILE)
 
 struct Gemm_params {
@@ -81,9 +81,9 @@ __device__ __forceinline__ uint32_t make_mxf4_idesc(int M_tile, int N_tile)
 }
 
 // ============================================================================
-// SMEM LOAD A - No swizzle, interleaved layout (LBO = 128)
+// SMEM LOAD A - 128B swizzle (mode 2)
 // ============================================================================
-__device__ __forceinline__ void load_a_interleaved(
+__device__ __forceinline__ void load_a_swizzle2(
     const Gemm_params& params, int m_block, int k_offset, uint8_t* a_smem)
 {
     const uint8_t* a_global = reinterpret_cast<const uint8_t*>(params.a_ptr)
@@ -94,17 +94,13 @@ __device__ __forceinline__ void load_a_interleaved(
         uint8_t val = a_global[m * params.a_row_stride + k_byte];
         int block_row = m / 8;
         int inner_row = m % 8;
-        int k_group = k_byte / 16;
-        int k_inner = k_byte % 16;
-        int smem_offset = inner_row * 16 + k_group * 128 + block_row * 256 + k_inner;
+        // 128B swizzle: XOR k_byte[6:4] with inner_row[2:0]
+        int swizzled_k = k_byte ^ ((inner_row & 0x7) << 4);
+        int smem_offset = block_row * 256 + inner_row * 32 + swizzled_k;
         a_smem[smem_offset] = val;
     }
 }
-
-// ============================================================================
-// SMEM LOAD B - No swizzle, interleaved layout (matches original)
-// ============================================================================
-__device__ __forceinline__ void load_b_interleaved(
+__device__ __forceinline__ void load_b_swizzle0_interleaved(
     const Gemm_params& params, int n_block, int k_offset, uint8_t* b_smem)
 {
     const uint8_t* b_global = reinterpret_cast<const uint8_t*>(params.b_ptr)
@@ -121,6 +117,7 @@ __device__ __forceinline__ void load_b_interleaved(
         b_smem[smem_offset] = val;
     }
 }
+
 
 // ============================================================================
 // SETUP / INIT
@@ -301,13 +298,12 @@ gemm_kernel_tcgen05(const __grid_constant__ Gemm_params params)
         uint8_t* a_smem = reinterpret_cast<uint8_t*>(tile_smem);
         uint8_t* b_smem = reinterpret_cast<uint8_t*>(tile_smem + SMEM_A_TILE);
 
-        // Load A and B with no swizzle, interleaved layout
-        load_a_interleaved(params, m_block, k_offset, a_smem);
-        load_b_interleaved(params, n_block, k_offset, b_smem);
+        load_a_swizzle2(params, m_block, k_offset, a_smem);
+        load_b_swizzle0_interleaved(params, n_block, k_offset, b_smem);
         __syncthreads();
 
-        // Descriptors: (leading_dim, stride_dim, swizzle_mode)
-        uint64_t a_desc = make_smem_desc(a_smem, 128, 256, 0);
+        // 128B swizzle: leading 16B (encoded 1), stride 256B, swizzle mode 2
+        uint64_t a_desc = make_smem_desc(a_smem, 16, 256, 2);
         uint64_t b_desc = make_smem_desc(b_smem, 128, 256, 0);
 
         load_scales_to_tmem(params, m_block, n_block, k_offset, tmem_sfa, tmem_sfb);
@@ -353,7 +349,7 @@ torch::Tensor cuda_nvfp4_gemm_tcgen05(
 """
 
 nvfp4_tcgen05_module = load_inline(
-    name="nvfp4_tcgen05_gemm",
+    name="nvfp4_tcgen05_gemm_swizzle2",
     cpp_sources=[cpp_src],
     cuda_sources=[cuda_src],
     functions=["cuda_nvfp4_gemm_tcgen05"],
