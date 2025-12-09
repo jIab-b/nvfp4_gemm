@@ -90,9 +90,6 @@ __device__ __forceinline__ void load_a_swizzle128B(
     const uint8_t* a_global = reinterpret_cast<const uint8_t*>(params.a_ptr)
                               + m_block * params.a_row_stride + k_offset / 2;
 
-    // MMA_M=128, MMA_K=64, so 128*64/2 = 4096 bytes total in global
-    // Each row: 32 bytes (64 FP4 elements / 2)
-    // Layout: 8 rows form one swizzle block, 128 bytes per row in the atom
 
     for (int i = threadIdx.x; i < MMA_M * MMA_K / 2; i += blockDim.x) {
         int m = i / (MMA_K / 2);           // row 0-127
@@ -100,19 +97,15 @@ __device__ __forceinline__ void load_a_swizzle128B(
 
         uint8_t val = a_global[m * params.a_row_stride + k_byte];
 
-        // Decompose m into block_row (which 8-row group) and inner_row (0-7)
+
         int block_row = m / 8;             // 0-15
         int inner_row = m % 8;             // 0-7
 
-        // Decompose k_byte into 16B chunk index and offset within chunk
         int chunk_idx = k_byte / 16;       // 0-1 (since 32 bytes = 2 chunks)
         int chunk_off = k_byte % 16;       // 0-15
 
-        // Apply 128B swizzle: XOR chunk_idx with inner_row (3 bits each)
         int swizzled_chunk = chunk_idx ^ inner_row;
 
-        // Each swizzle atom is 8 rows × 128 bytes = 1024 bytes
-        // Within atom: row stride = 128 bytes
         int smem_offset = block_row * 1024 +      // which 8-row block
                           inner_row * 128 +        // row within block (128B stride)
                           swizzled_chunk * 16 +    // swizzled chunk position
@@ -180,9 +173,11 @@ __device__ __forceinline__ void load_scales_to_tmem(
     uint32_t sfa_val = *reinterpret_cast<const uint32_t*>(
         sfa_base + m_row * params.sfa_row_stride + sf_k_idx);
 
+    // Each warp writes to a different TMEM column (warp 0 -> col 0, warp 1 -> col 1, etc.)
+    // This covers 128 M-rows: 4 warps * 32 lanes = 128 rows
     asm volatile(
         "tcgen05.st.sync.aligned.32x32b.x1.b32 [%0], {%1};"
-        :: "r"(tmem_sfa), "r"(sfa_val) : "memory"
+        :: "r"(tmem_sfa + warp_id), "r"(sfa_val) : "memory"
     );
 
     const uint8_t* sfb_base = reinterpret_cast<const uint8_t*>(params.sfb_ptr);
@@ -323,7 +318,7 @@ gemm_kernel_tcgen05(const __grid_constant__ Gemm_params params)
         load_b_swizzle0_interleaved(params, n_block, k_offset, b_smem);
         __syncthreads();
 
-        // 128B swizzle: leading 16B, stride 1024B (8 rows * 128B), swizzle mode 2
+
         uint64_t a_desc = make_smem_desc(a_smem, 16, 1024, 2);
         uint64_t b_desc = make_smem_desc(b_smem, 128, 256, 0);
 

@@ -162,9 +162,11 @@ __device__ __forceinline__ void load_scales_to_tmem(
     uint32_t sfa_val = *reinterpret_cast<const uint32_t*>(
         sfa_base + m_row * params.sfa_row_stride + sf_k_idx);
 
+    // Each warp writes to a different TMEM column (warp 0 -> col 0, warp 1 -> col 1, etc.)
+    // This covers 128 M-rows: 4 warps * 32 lanes = 128 rows
     asm volatile(
         "tcgen05.st.sync.aligned.32x32b.x1.b32 [%0], {%1};"
-        :: "r"(tmem_sfa), "r"(sfa_val) : "memory"
+        :: "r"(tmem_sfa + warp_id), "r"(sfa_val) : "memory"
     );
 
     const uint8_t* sfb_base = reinterpret_cast<const uint8_t*>(params.sfb_ptr);
