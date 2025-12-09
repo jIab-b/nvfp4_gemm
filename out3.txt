@@ -1,0 +1,27 @@
+"**NVIDIA on GitHub ✅ success**
+> Workflow [20054280016](<https://github.com/gpu-mode/discord-cluster-manager/actions/runs/20054280016>) completed
+> Downloading artifacts... done
+> ✅ Benchmarking successful
+
+Running on:
+* GPU: `NVIDIA B200`
+* CPU: `INTEL(R) XEON(R) PLATINUM 8570`
+* Runtime: `CUDA`
+* Platform: `Linux-6.8.0-51-generic-x86_64-with-glibc2.35`
+* Torch: `2.9.1+cu130`
+
+
+## Benchmarks:
+```
+k: 16384; l: 1; m: 128; n: 7168; seed: 1111
+ ⏱ 1749 ± 0.3 µs
+ ⚡ 1749 µs 🐌 1749 µs
+
+k: 7168; l: 1; m: 128; n: 4096; seed: 1111
+ ⏱ 756 ± 0.3 µs
+ ⚡ 755 µs 🐌 756 µs
+
+k: 2048; l: 1; m: 128; n: 7168; seed: 1111
+ ⏱ 231 ± 0.1 µs
+ ⚡ 231 µs 🐌 232 µs
+```"
