@@ -379,8 +379,10 @@ gemm_kernel_tcgen05(const __grid_constant__ Gemm_params params)
     for (int k_tile = 0; k_tile < num_k_tiles; k_tile += K_PER_TMA) {
         const int k_byte_offset = k_tile * 32;
 
-        // TMA load with hardware swizzle
+        // TMA load with hardware swizzle - must wait separately
         tma_load_a(&params.tensormap_a, m_block, k_byte_offset, a_smem_addr, mbar_tma);
+        wait_tma(mbar_tma, tma_phase);
+
         tma_load_b(&params.tensormap_b, n_block, k_byte_offset, b_smem_addr, mbar_tma);
         wait_tma(mbar_tma, tma_phase);
         __syncthreads();

@@ -1,7 +1,7 @@
 "**NVIDIA on GitHub ✅ success**
-> Workflow [20060086628](<https://github.com/gpu-mode/discord-cluster-manager/actions/runs/20060086628>) completed
+> Workflow [20060174740](<https://github.com/gpu-mode/discord-cluster-manager/actions/runs/20060174740>) completed
 > Downloading artifacts... done
-> ❌ Running benchmarks failed (internal error 1)
+> ❌ Benchmarking failed
 
 Running on:
 * GPU: `NVIDIA B200`
@@ -9,42 +9,19 @@ Running on:
 * Runtime: `CUDA`
 * Platform: `Linux-6.8.0-51-generic-x86_64-with-glibc2.35`
 * Torch: `2.9.1+cu130`
-# Running failed
-Command ```bash
-python3 eval.py benchmark /tmp/tmpzypq7tc5```
-exited with error code **1** after 3.83 seconds.
 
-## Program stderr:
+
+## Benchmarks:
 ```
-multiprocessing.pool.RemoteTraceback: 
-\"\"\"
-Traceback (most recent call last):
-  File \"/usr/lib/python3.10/multiprocessing/pool.py\", line 125, in worker
-    result = (True, func(*args, **kwds))
-  File \"/home/runner/_work/discord-cluster-manager/discord-cluster-manager/eval.py\", line 233, in _run_single_benchmark
-    good, message = check_implementation(reference_output, custom_output)
-  File \"/home/runner/_work/discord-cluster-manager/discord-cluster-manager/utils.py\", line 156, in wrapped
-    return match_reference(data, output, reference=reference, **kwargs)
-  File \"/home/runner/_work/discord-cluster-manager/discord-cluster-manager/utils.py\", line 141, in match_reference
-    expected = reference(data)
-  File \"/home/runner/_work/discord-cluster-manager/discord-cluster-manager/reference.py\", line 44, in ref_kernel
-    res = torch._scaled_mm(
-RuntimeError: CUDA error: CUBLAS_STATUS_INTERNAL_ERROR when calling `cublasCreate(handle)`
-\"\"\"
+❌ k: 16384; l: 1; m: 128; n: 7168; seed: 1111 failed testing:
 
-The above exception was the direct cause of the following exception:
+mismatch found! custom implementation doesn't match reference: Number of mismatched elements: 323715 ERROR AT (32, 0, 0): -300.25 85.25 ERROR AT (32, 1, 0): 7200.0 7084.0 ERROR AT (32, 2, 0): 306.0 597.0 ERROR AT (32, 3, 0): 631.0 471.25 ERROR AT (32, 4, 0): 520.5 165.0 ... and 323710 more mismatched elements.
 
-Traceback (most recent call last):
-  File \"/home/runner/_work/discord-cluster-manager/discord-cluster-manager/eval.py\", line 498, in <module>
-    sys.exit(main())
-  File \"/home/runner/_work/discord-cluster-manager/discord-cluster-manager/eval.py\", line 466, in main
-    return run_benchmarking(logger, pool, tests)
-  File \"/home/runner/_work/discord-cluster-manager/discord-cluster-manager/eval.py\", line 319, in run_benchmarking
-    run_single_benchmark(pool, tests[0], False, 200, 10e7)
-  File \"/home/runner/_work/discord-cluster-manager/discord-cluster-manager/eval.py\", line 304, in run_single_benchmark
-    return pool.apply(_run_single_benchmark, (test, recheck, max_repeats, max_time_ns))
-  File \"/usr/lib/python3.10/multiprocessing/pool.py\", line 360, in apply
-    return self.apply_async(func, args, kwds).get()
-  File \"/usr/lib/python3.10/multiprocessing/pool.py\", line 774, in get
-    raise self._value
-RuntimeError: CUDA error: CUBLAS_STATUS_INTERNAL_ERROR when calling `cublasCreate(handle)````"
+❌ k: 7168; l: 1; m: 128; n: 4096; seed: 1111 failed testing:
+
+mismatch found! custom implementation doesn't match reference: Number of mismatched elements: 76263 ERROR AT (32, 640, 0): -787.5 -1104.0 ERROR AT (32, 641, 0): 1331.0 124.5 ERROR AT (32, 642, 0): 2788.0 2552.0 ERROR AT (32, 643, 0): -2718.0 -2580.0 ERROR AT (32, 644, 0): -10312.0 -339.25 ... and 76258 more mismatched elements.
+
+❌ k: 2048; l: 1; m: 128; n: 7168; seed: 1111 failed testing:
+
+mismatch found! custom implementation doesn't match reference: Number of mismatched elements: 62966 ERROR AT (32, 1248, 0): -1114.0 -1167.0 ERROR AT (32, 1250, 0): -2074.0 -2320.0 ERROR AT (32, 1251, 0): 578.5 849.0 ERROR AT (32, 1252, 0): 23.75 166.75 ERROR AT (32, 1253, 0): 1697.0 1491.0 ... and 62961 more mismatched elements.
+```"
