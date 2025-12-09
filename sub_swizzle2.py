@@ -33,8 +33,9 @@ static constexpr int WARPS_PER_CTA = 4;
 static constexpr int THREADS_PER_WARP = 32;
 static constexpr int TMEM_COLS = 128;
 
-#define SMEM_A_TILE      (MMA_M * MMA_K / 2)
-#define SMEM_B_TILE      (MMA_N * MMA_K / 2)
+// For 128B swizzle: each 8-row block needs 8*128=1024 bytes, MMA_M/8=16 blocks = 16384 bytes for A
+#define SMEM_A_TILE      (16 * 1024)  // 128B swizzle layout: 16 blocks of 1024 bytes each
+#define SMEM_B_TILE      (MMA_N * MMA_K / 2)  // B uses interleaved layout (no swizzle)
 #define SMEM_OFF_MBAR    8
 #define SMEM_OFF_TILES   1024  // 1024B alignment covers swizzle boundaries
 #define SMEM_TOTAL       (SMEM_OFF_TILES + SMEM_A_TILE + SMEM_B_TILE)
@@ -83,20 +84,40 @@ __device__ __forceinline__ uint32_t make_mxf4_idesc(int M_tile, int N_tile)
 // ============================================================================
 // SMEM LOAD A - 128B swizzle (mode 2)
 // ============================================================================
-__device__ __forceinline__ void load_a_swizzle2(
+__device__ __forceinline__ void load_a_swizzle128B(
     const Gemm_params& params, int m_block, int k_offset, uint8_t* a_smem)
 {
     const uint8_t* a_global = reinterpret_cast<const uint8_t*>(params.a_ptr)
                               + m_block * params.a_row_stride + k_offset / 2;
+
+    // MMA_M=128, MMA_K=64, so 128*64/2 = 4096 bytes total in global
+    // Each row: 32 bytes (64 FP4 elements / 2)
+    // Layout: 8 rows form one swizzle block, 128 bytes per row in the atom
+
     for (int i = threadIdx.x; i < MMA_M * MMA_K / 2; i += blockDim.x) {
-        int m = i / (MMA_K / 2);
-        int k_byte = i % (MMA_K / 2);
+        int m = i / (MMA_K / 2);           // row 0-127
+        int k_byte = i % (MMA_K / 2);      // byte 0-31 within row
+
         uint8_t val = a_global[m * params.a_row_stride + k_byte];
-        int block_row = m / 8;
-        int inner_row = m % 8;
-        // 128B swizzle: XOR k_byte[6:4] with inner_row[2:0]
-        int swizzled_k = k_byte ^ ((inner_row & 0x7) << 4);
-        int smem_offset = block_row * 256 + inner_row * 32 + swizzled_k;
+
+        // Decompose m into block_row (which 8-row group) and inner_row (0-7)
+        int block_row = m / 8;             // 0-15
+        int inner_row = m % 8;             // 0-7
+
+        // Decompose k_byte into 16B chunk index and offset within chunk
+        int chunk_idx = k_byte / 16;       // 0-1 (since 32 bytes = 2 chunks)
+        int chunk_off = k_byte % 16;       // 0-15
+
+        // Apply 128B swizzle: XOR chunk_idx with inner_row (3 bits each)
+        int swizzled_chunk = chunk_idx ^ inner_row;
+
+        // Each swizzle atom is 8 rows × 128 bytes = 1024 bytes
+        // Within atom: row stride = 128 bytes
+        int smem_offset = block_row * 1024 +      // which 8-row block
+                          inner_row * 128 +        // row within block (128B stride)
+                          swizzled_chunk * 16 +    // swizzled chunk position
+                          chunk_off;               // byte within chunk
+
         a_smem[smem_offset] = val;
     }
 }
@@ -298,12 +319,12 @@ gemm_kernel_tcgen05(const __grid_constant__ Gemm_params params)
         uint8_t* a_smem = reinterpret_cast<uint8_t*>(tile_smem);
         uint8_t* b_smem = reinterpret_cast<uint8_t*>(tile_smem + SMEM_A_TILE);
 
-        load_a_swizzle2(params, m_block, k_offset, a_smem);
+        load_a_swizzle128B(params, m_block, k_offset, a_smem);
         load_b_swizzle0_interleaved(params, n_block, k_offset, b_smem);
         __syncthreads();
 
-        // 128B swizzle: leading 16B (encoded 1), stride 256B, swizzle mode 2
-        uint64_t a_desc = make_smem_desc(a_smem, 16, 256, 2);
+        // 128B swizzle: leading 16B, stride 1024B (8 rows * 128B), swizzle mode 2
+        uint64_t a_desc = make_smem_desc(a_smem, 16, 1024, 2);
         uint64_t b_desc = make_smem_desc(b_smem, 128, 256, 0);
 
         load_scales_to_tmem(params, m_block, n_block, k_offset, tmem_sfa, tmem_sfb);
