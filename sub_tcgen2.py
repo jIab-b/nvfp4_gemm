@@ -37,7 +37,8 @@ static constexpr int TMEM_COLS = 128;
 #define SMEM_A_TILE      (MMA_M * 32)   // 128 rows * 32 bytes = 4096
 #define SMEM_B_TILE      (MMA_N * MMA_K / 2)  // 64 * 32 = 2048
 #define SMEM_OFF_MBAR_MMA   8
-#define SMEM_OFF_MBAR_TMA   16
+#define SMEM_OFF_MBAR_TMA_A 16
+#define SMEM_OFF_MBAR_TMA_B 24
 #define SMEM_OFF_TILES   256  // 256B alignment for 32B swizzle
 #define SMEM_TOTAL       (SMEM_OFF_TILES + SMEM_A_TILE + SMEM_B_TILE)
 
@@ -124,7 +125,7 @@ __device__ __forceinline__ void wait_tma(uint32_t mbar_smem, int& phase)
 // SETUP / INIT
 // ============================================================================
 __device__ __forceinline__ void init_tmem_and_mbars(
-    char* smem, uint32_t smem_base, uint32_t mbar_mma, uint32_t mbar_tma,
+    char* smem, uint32_t smem_base, uint32_t mbar_mma, uint32_t mbar_tma_a, uint32_t mbar_tma_b,
     uint32_t& tmem_d, uint32_t& tmem_sfa, uint32_t& tmem_sfb)
 {
     if (threadIdx.x < 32) {
@@ -141,7 +142,9 @@ __device__ __forceinline__ void init_tmem_and_mbars(
         asm volatile("mbarrier.init.shared::cta.b64 [%0], %1;"
             :: "r"(mbar_mma), "r"(1) : "memory");
         asm volatile("mbarrier.init.shared::cta.b64 [%0], %1;"
-            :: "r"(mbar_tma), "r"(1) : "memory");
+            :: "r"(mbar_tma_a), "r"(1) : "memory");
+        asm volatile("mbarrier.init.shared::cta.b64 [%0], %1;"
+            :: "r"(mbar_tma_b), "r"(1) : "memory");
     }
     __syncthreads();
 }
@@ -283,19 +286,21 @@ gemm_kernel_tcgen05(const __grid_constant__ Gemm_params params)
 
     const uint32_t smem_base = __cvta_generic_to_shared(smem);
     const uint32_t mbar_mma = smem_base + SMEM_OFF_MBAR_MMA;
-    const uint32_t mbar_tma = smem_base + SMEM_OFF_MBAR_TMA;
+    const uint32_t mbar_tma_a = smem_base + SMEM_OFF_MBAR_TMA_A;
+    const uint32_t mbar_tma_b = smem_base + SMEM_OFF_MBAR_TMA_B;
 
     const int m_block = blockIdx.y * MMA_M;
     const int n_block = blockIdx.x * MMA_N;
     if (m_block >= params.M || n_block >= params.N) return;
 
     uint32_t tmem_d, tmem_sfa, tmem_sfb;
-    init_tmem_and_mbars(smem, smem_base, mbar_mma, mbar_tma, tmem_d, tmem_sfa, tmem_sfb);
+    init_tmem_and_mbars(smem, smem_base, mbar_mma, mbar_tma_a, mbar_tma_b, tmem_d, tmem_sfa, tmem_sfb);
 
     uint32_t idesc = make_mxf4_idesc(MMA_M, MMA_N);
     const int num_k_tiles = params.K / MMA_K;
     int mma_phase = 0;
-    int tma_phase = 0;
+    int tma_phase_a = 0;
+    int tma_phase_b = 0;
 
     uint8_t* a_smem = reinterpret_cast<uint8_t*>(smem + SMEM_OFF_TILES);
     uint8_t* b_smem = reinterpret_cast<uint8_t*>(smem + SMEM_OFF_TILES + SMEM_A_TILE);
@@ -306,12 +311,11 @@ gemm_kernel_tcgen05(const __grid_constant__ Gemm_params params)
         const int k_offset = k_tile * MMA_K;
         const int k_bytes = k_offset / 2;
 
-        // TMA load A and B with 32B hardware swizzle (both use same mbar, sequential)
-        tma_load(&params.tensormap_a, m_block, k_bytes, a_smem_addr, mbar_tma, SMEM_A_TILE);
-        wait_tma(mbar_tma, tma_phase);
-
-        tma_load(&params.tensormap_b, n_block, k_bytes, b_smem_addr, mbar_tma, SMEM_B_TILE);
-        wait_tma(mbar_tma, tma_phase);
+        // TMA load A and B in parallel with separate mbarriers
+        tma_load(&params.tensormap_a, m_block, k_bytes, a_smem_addr, mbar_tma_a, SMEM_A_TILE);
+        tma_load(&params.tensormap_b, n_block, k_bytes, b_smem_addr, mbar_tma_b, SMEM_B_TILE);
+        wait_tma(mbar_tma_a, tma_phase_a);
+        wait_tma(mbar_tma_b, tma_phase_b);
         __syncthreads();
 
         // Both A and B use 32B swizzle (mode 6)
