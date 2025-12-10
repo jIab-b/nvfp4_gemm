@@ -36,11 +36,15 @@ static constexpr int TMEM_COLS = 128;
 // 32B swizzle: 8 rows x 32 bytes = 256 byte atom, MMA_M/8 = 16 atoms
 #define SMEM_A_TILE      (MMA_M * 32)   // 128 rows * 32 bytes = 4096
 #define SMEM_B_TILE      (MMA_N * MMA_K / 2)  // 64 * 32 = 2048
+#define SMEM_SFA_TILE    (MMA_M * 4)    // 128 rows * 4 bytes = 512 (16B aligned)
+#define SMEM_SFB_TILE    (MMA_N * 4)    // 64 rows * 4 bytes = 256 (16B aligned)
 #define SMEM_OFF_MBAR_MMA   8
 #define SMEM_OFF_MBAR_TMA_A 16
 #define SMEM_OFF_MBAR_TMA_B 24
 #define SMEM_OFF_TILES   256  // 256B alignment for 32B swizzle
-#define SMEM_TOTAL       (SMEM_OFF_TILES + SMEM_A_TILE + SMEM_B_TILE)
+#define SMEM_OFF_SFA     (SMEM_OFF_TILES + SMEM_A_TILE + SMEM_B_TILE)
+#define SMEM_OFF_SFB     (SMEM_OFF_SFA + SMEM_SFA_TILE)
+#define SMEM_TOTAL       (SMEM_OFF_SFB + SMEM_SFB_TILE)
 
 struct Gemm_params {
     int M, N, K;
@@ -168,35 +172,68 @@ __device__ __forceinline__ void init_tmem_and_mbars(
 }
 
 // ============================================================================
-// TMEM LOAD SCALE FACTORS
+// ASYNC SCALE LOADING: global -> smem (cp.async) -> tmem (tcgen05.st)
 // ============================================================================
-__device__ __forceinline__ void load_scales_to_tmem(
+__device__ __forceinline__ void load_scales_async_to_smem(
     const Gemm_params& params, int m_block, int n_block, int k_offset,
-    uint32_t tmem_sfa, uint32_t tmem_sfb)
+    uint32_t sfa_smem_addr, uint32_t sfb_smem_addr)
 {
     const int lane_id = threadIdx.x % 32;
     const int warp_id = threadIdx.x / 32;
     const int sf_k_idx = k_offset / 16;
-    int m_row = m_block + warp_id * 32 + lane_id;
 
+    // SFA: 128 threads load 128 rows * 4 bytes = 512 bytes
+    int m_row = m_block + warp_id * 32 + lane_id;
     const uint8_t* sfa_base = reinterpret_cast<const uint8_t*>(params.sfa_ptr);
-    uint64_t sfa_addr = reinterpret_cast<uint64_t>(sfa_base + m_row * params.sfa_row_stride + sf_k_idx);
+    uint64_t sfa_gaddr = reinterpret_cast<uint64_t>(sfa_base + m_row * params.sfa_row_stride + sf_k_idx);
+    uint32_t sfa_saddr = sfa_smem_addr + (warp_id * 32 + lane_id) * 4;
+
+    asm volatile(
+        "cp.async.ca.shared.global [%0], [%1], 4;"
+        :: "r"(sfa_saddr), "l"(sfa_gaddr) : "memory"
+    );
+
+    // SFB: first 64 threads load 64 rows * 4 bytes = 256 bytes
+    if (threadIdx.x < 64) {
+        int n_row = n_block + threadIdx.x;
+        const uint8_t* sfb_base = reinterpret_cast<const uint8_t*>(params.sfb_ptr);
+        uint64_t sfb_gaddr = reinterpret_cast<uint64_t>(sfb_base + n_row * params.sfb_row_stride + sf_k_idx);
+        uint32_t sfb_saddr = sfb_smem_addr + threadIdx.x * 4;
+
+        asm volatile(
+            "cp.async.ca.shared.global [%0], [%1], 4;"
+            :: "r"(sfb_saddr), "l"(sfb_gaddr) : "memory"
+        );
+    }
+
+    // Commit and wait for all cp.async to complete
+    asm volatile("cp.async.commit_group;" ::: "memory");
+    asm volatile("cp.async.wait_group 0;" ::: "memory");
+}
+
+__device__ __forceinline__ void copy_scales_smem_to_tmem(
+    uint32_t sfa_smem_addr, uint32_t sfb_smem_addr,
+    uint32_t tmem_sfa, uint32_t tmem_sfb)
+{
+    const int lane_id = threadIdx.x % 32;
+    const int warp_id = threadIdx.x / 32;
+
+    // Load SFA from smem and store to tmem
+    uint32_t sfa_saddr = sfa_smem_addr + (warp_id * 32 + lane_id) * 4;
     uint32_t sfa_val;
-    // SFA: unique per M row, evict after use
-    asm volatile("ld.global.cs.u32 %0, [%1];" : "=r"(sfa_val) : "l"(sfa_addr) : "memory");
+    asm volatile("ld.shared.u32 %0, [%1];" : "=r"(sfa_val) : "r"(sfa_saddr) : "memory");
 
     asm volatile(
         "tcgen05.st.sync.aligned.32x32b.x1.b32 [%0], {%1};"
         :: "r"(tmem_sfa + warp_id), "r"(sfa_val) : "memory"
     );
 
-    const uint8_t* sfb_base = reinterpret_cast<const uint8_t*>(params.sfb_ptr);
-    uint64_t sfb_addr0 = reinterpret_cast<uint64_t>(sfb_base + (n_block + lane_id) * params.sfb_row_stride + sf_k_idx);
-    uint64_t sfb_addr1 = reinterpret_cast<uint64_t>(sfb_base + (n_block + lane_id + 32) * params.sfb_row_stride + sf_k_idx);
+    // Load SFB from smem and store to tmem (all 128 threads, 2 loads per 64 threads)
+    uint32_t sfb_saddr0 = sfb_smem_addr + lane_id * 4;
+    uint32_t sfb_saddr1 = sfb_smem_addr + (lane_id + 32) * 4;
     uint32_t sfb_val0, sfb_val1;
-    // SFB: reused across M blocks, keep in L2
-    asm volatile("ld.global.L2::128B.u32 %0, [%1];" : "=r"(sfb_val0) : "l"(sfb_addr0) : "memory");
-    asm volatile("ld.global.L2::128B.u32 %0, [%1];" : "=r"(sfb_val1) : "l"(sfb_addr1) : "memory");
+    asm volatile("ld.shared.u32 %0, [%1];" : "=r"(sfb_val0) : "r"(sfb_saddr0) : "memory");
+    asm volatile("ld.shared.u32 %0, [%1];" : "=r"(sfb_val1) : "r"(sfb_saddr1) : "memory");
 
     asm volatile(
         "tcgen05.st.sync.aligned.32x32b.x1.b32 [%0], {%1};"
@@ -328,6 +365,8 @@ gemm_kernel_tcgen05(const __grid_constant__ Gemm_params params)
     uint8_t* b_smem = reinterpret_cast<uint8_t*>(smem + SMEM_OFF_TILES + SMEM_A_TILE);
     uint32_t a_smem_addr = smem_base + SMEM_OFF_TILES;
     uint32_t b_smem_addr = smem_base + SMEM_OFF_TILES + SMEM_A_TILE;
+    uint32_t sfa_smem_addr = smem_base + SMEM_OFF_SFA;
+    uint32_t sfb_smem_addr = smem_base + SMEM_OFF_SFB;
 
     for (int k_tile = 0; k_tile < num_k_tiles; k_tile++) {
         const int k_offset = k_tile * MMA_K;
@@ -336,19 +375,24 @@ gemm_kernel_tcgen05(const __grid_constant__ Gemm_params params)
         // TMA load A and B in parallel with separate mbarriers
         tma_load(&params.tensormap_a, m_block, k_bytes, a_smem_addr, mbar_tma_a, SMEM_A_TILE);
         tma_load(&params.tensormap_b, n_block, k_bytes, b_smem_addr, mbar_tma_b, SMEM_B_TILE);
-        wait_tma_both(mbar_tma_a, tma_phase_a, mbar_tma_b, tma_phase_b);
+
+        // Async load scales to smem while TMA loads A/B
+        load_scales_async_to_smem(params, m_block, n_block, k_offset, sfa_smem_addr, sfb_smem_addr);
         __syncthreads();
+
+        wait_tma_both(mbar_tma_a, tma_phase_a, mbar_tma_b, tma_phase_b);
 
         // Both A and B use 32B swizzle (mode 6)
         uint64_t a_desc = make_smem_desc(a_smem, 16, 256, 6);
         uint64_t b_desc = make_smem_desc(b_smem, 16, 256, 6);
 
-        load_scales_to_tmem(params, m_block, n_block, k_offset, tmem_sfa, tmem_sfb);
-        __syncthreads();
+        // Copy scales from smem to tmem
+        copy_scales_smem_to_tmem(sfa_smem_addr, sfb_smem_addr, tmem_sfa, tmem_sfb);
+      //  __syncthreads();
 
         issue_mma(tmem_d, a_desc, b_desc, idesc, tmem_sfa, tmem_sfb, mbar_mma, k_tile > 0);
         wait_mma(mbar_mma, mma_phase);
-        __syncthreads();
+      //  __syncthreads();
     }
 
     load_accum_and_store(params, m_block, n_block, tmem_d);

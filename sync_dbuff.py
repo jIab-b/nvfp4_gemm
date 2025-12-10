@@ -38,13 +38,22 @@ static constexpr int TMEM_COLS = 128;
 #define SMEM_B_TILE      (MMA_N * MMA_K / 2)  // 64 * 32 = 2048
 #define SMEM_SFA_TILE    (MMA_M * 4)    // 128 rows * 4 bytes = 512 (16B aligned)
 #define SMEM_SFB_TILE    (MMA_N * 4)    // 64 rows * 4 bytes = 256 (16B aligned)
-#define SMEM_OFF_MBAR_MMA   8
-#define SMEM_OFF_MBAR_TMA_A 16
-#define SMEM_OFF_MBAR_TMA_B 24
+#define NUM_BUFFERS      2              // Double buffering
+
+// Mbarrier offsets (8 bytes each)
+#define SMEM_OFF_MBAR_MMA     8
+#define SMEM_OFF_MBAR_TMA_A0  16
+#define SMEM_OFF_MBAR_TMA_A1  24
+#define SMEM_OFF_MBAR_TMA_B0  32
+#define SMEM_OFF_MBAR_TMA_B1  40
+
 #define SMEM_OFF_TILES   256  // 256B alignment for 32B swizzle
-#define SMEM_OFF_SFA     (SMEM_OFF_TILES + SMEM_A_TILE + SMEM_B_TILE)
-#define SMEM_OFF_SFB     (SMEM_OFF_SFA + SMEM_SFA_TILE)
-#define SMEM_TOTAL       (SMEM_OFF_SFB + SMEM_SFB_TILE)
+// Double buffered layout: [A0][A1][B0][B1][SFA0][SFA1][SFB0][SFB1]
+#define SMEM_OFF_A(buf)      (SMEM_OFF_TILES + (buf) * SMEM_A_TILE)
+#define SMEM_OFF_B(buf)      (SMEM_OFF_TILES + NUM_BUFFERS * SMEM_A_TILE + (buf) * SMEM_B_TILE)
+#define SMEM_OFF_SFA(buf)    (SMEM_OFF_TILES + NUM_BUFFERS * SMEM_A_TILE + NUM_BUFFERS * SMEM_B_TILE + (buf) * SMEM_SFA_TILE)
+#define SMEM_OFF_SFB(buf)    (SMEM_OFF_TILES + NUM_BUFFERS * SMEM_A_TILE + NUM_BUFFERS * SMEM_B_TILE + NUM_BUFFERS * SMEM_SFA_TILE + (buf) * SMEM_SFB_TILE)
+#define SMEM_TOTAL           (SMEM_OFF_TILES + NUM_BUFFERS * (SMEM_A_TILE + SMEM_B_TILE + SMEM_SFA_TILE + SMEM_SFB_TILE))
 
 struct Gemm_params {
     int M, N, K;
@@ -147,7 +156,9 @@ __device__ __forceinline__ void wait_tma_both(
 // SETUP / INIT
 // ============================================================================
 __device__ __forceinline__ void init_tmem_and_mbars(
-    char* smem, uint32_t smem_base, uint32_t mbar_mma, uint32_t mbar_tma_a, uint32_t mbar_tma_b,
+    char* smem, uint32_t smem_base, uint32_t mbar_mma,
+    uint32_t mbar_tma_a0, uint32_t mbar_tma_a1,
+    uint32_t mbar_tma_b0, uint32_t mbar_tma_b1,
     uint32_t& tmem_d, uint32_t& tmem_sfa, uint32_t& tmem_sfb)
 {
     if (threadIdx.x < 32) {
@@ -164,9 +175,13 @@ __device__ __forceinline__ void init_tmem_and_mbars(
         asm volatile("mbarrier.init.shared::cta.b64 [%0], %1;"
             :: "r"(mbar_mma), "r"(1) : "memory");
         asm volatile("mbarrier.init.shared::cta.b64 [%0], %1;"
-            :: "r"(mbar_tma_a), "r"(1) : "memory");
+            :: "r"(mbar_tma_a0), "r"(1) : "memory");
         asm volatile("mbarrier.init.shared::cta.b64 [%0], %1;"
-            :: "r"(mbar_tma_b), "r"(1) : "memory");
+            :: "r"(mbar_tma_a1), "r"(1) : "memory");
+        asm volatile("mbarrier.init.shared::cta.b64 [%0], %1;"
+            :: "r"(mbar_tma_b0), "r"(1) : "memory");
+        asm volatile("mbarrier.init.shared::cta.b64 [%0], %1;"
+            :: "r"(mbar_tma_b1), "r"(1) : "memory");
     }
     __syncthreads();
 }
@@ -206,9 +221,17 @@ __device__ __forceinline__ void load_scales_async_to_smem(
         );
     }
 
-    // Commit and wait for all cp.async to complete
+    // Commit the group (don't wait - caller will wait)
     asm volatile("cp.async.commit_group;" ::: "memory");
-    asm volatile("cp.async.wait_group 0;" ::: "memory");
+}
+
+__device__ __forceinline__ void wait_scales_async(int groups_to_wait)
+{
+    if (groups_to_wait == 0) {
+        asm volatile("cp.async.wait_group 0;" ::: "memory");
+    } else {
+        asm volatile("cp.async.wait_group 1;" ::: "memory");
+    }
 }
 
 __device__ __forceinline__ void copy_scales_smem_to_tmem(
@@ -336,7 +359,7 @@ __device__ __forceinline__ void dealloc_tmem(uint32_t tmem_d)
 }
 
 // ============================================================================
-// MAIN KERNEL
+// MAIN KERNEL (Double Buffered)
 // ============================================================================
 __global__ void __launch_bounds__(WARPS_PER_CTA * THREADS_PER_WARP)
 gemm_kernel_tcgen05(const __grid_constant__ Gemm_params params)
@@ -345,54 +368,79 @@ gemm_kernel_tcgen05(const __grid_constant__ Gemm_params params)
 
     const uint32_t smem_base = __cvta_generic_to_shared(smem);
     const uint32_t mbar_mma = smem_base + SMEM_OFF_MBAR_MMA;
-    const uint32_t mbar_tma_a = smem_base + SMEM_OFF_MBAR_TMA_A;
-    const uint32_t mbar_tma_b = smem_base + SMEM_OFF_MBAR_TMA_B;
+    const uint32_t mbar_tma_a[2] = {smem_base + SMEM_OFF_MBAR_TMA_A0, smem_base + SMEM_OFF_MBAR_TMA_A1};
+    const uint32_t mbar_tma_b[2] = {smem_base + SMEM_OFF_MBAR_TMA_B0, smem_base + SMEM_OFF_MBAR_TMA_B1};
 
     const int m_block = blockIdx.y * MMA_M;
     const int n_block = blockIdx.x * MMA_N;
     if (m_block >= params.M || n_block >= params.N) return;
 
     uint32_t tmem_d, tmem_sfa, tmem_sfb;
-    init_tmem_and_mbars(smem, smem_base, mbar_mma, mbar_tma_a, mbar_tma_b, tmem_d, tmem_sfa, tmem_sfb);
+    init_tmem_and_mbars(smem, smem_base, mbar_mma,
+                        mbar_tma_a[0], mbar_tma_a[1],
+                        mbar_tma_b[0], mbar_tma_b[1],
+                        tmem_d, tmem_sfa, tmem_sfb);
 
     uint32_t idesc = make_mxf4_idesc(MMA_M, MMA_N);
     const int num_k_tiles = params.K / MMA_K;
     int mma_phase = 0;
-    int tma_phase_a = 0;
-    int tma_phase_b = 0;
+    int tma_phase_a[2] = {0, 0};
+    int tma_phase_b[2] = {0, 0};
 
-    uint8_t* a_smem = reinterpret_cast<uint8_t*>(smem + SMEM_OFF_TILES);
-    uint8_t* b_smem = reinterpret_cast<uint8_t*>(smem + SMEM_OFF_TILES + SMEM_A_TILE);
-    uint32_t a_smem_addr = smem_base + SMEM_OFF_TILES;
-    uint32_t b_smem_addr = smem_base + SMEM_OFF_TILES + SMEM_A_TILE;
-    uint32_t sfa_smem_addr = smem_base + SMEM_OFF_SFA;
-    uint32_t sfb_smem_addr = smem_base + SMEM_OFF_SFB;
+    // Double buffer addresses
+    uint8_t* a_smem[2] = {
+        reinterpret_cast<uint8_t*>(smem + SMEM_OFF_A(0)),
+        reinterpret_cast<uint8_t*>(smem + SMEM_OFF_A(1))
+    };
+    uint8_t* b_smem[2] = {
+        reinterpret_cast<uint8_t*>(smem + SMEM_OFF_B(0)),
+        reinterpret_cast<uint8_t*>(smem + SMEM_OFF_B(1))
+    };
+    uint32_t a_smem_addr[2] = {smem_base + SMEM_OFF_A(0), smem_base + SMEM_OFF_A(1)};
+    uint32_t b_smem_addr[2] = {smem_base + SMEM_OFF_B(0), smem_base + SMEM_OFF_B(1)};
+    uint32_t sfa_smem_addr[2] = {smem_base + SMEM_OFF_SFA(0), smem_base + SMEM_OFF_SFA(1)};
+    uint32_t sfb_smem_addr[2] = {smem_base + SMEM_OFF_SFB(0), smem_base + SMEM_OFF_SFB(1)};
 
+    // ========== PROLOGUE: Load first tile into buffer 0 ==========
+    {
+        const int k_bytes = 0;
+        tma_load(&params.tensormap_a, m_block, k_bytes, a_smem_addr[0], mbar_tma_a[0], SMEM_A_TILE);
+        tma_load(&params.tensormap_b, n_block, k_bytes, b_smem_addr[0], mbar_tma_b[0], SMEM_B_TILE);
+        load_scales_async_to_smem(params, m_block, n_block, 0, sfa_smem_addr[0], sfb_smem_addr[0]);
+    }
+
+    // ========== MAIN LOOP ==========
     for (int k_tile = 0; k_tile < num_k_tiles; k_tile++) {
-        const int k_offset = k_tile * MMA_K;
-        const int k_bytes = k_offset / 2;
+        const int curr = k_tile % 2;
+        const int next = (k_tile + 1) % 2;
 
-        // TMA load A and B in parallel with separate mbarriers
-        tma_load(&params.tensormap_a, m_block, k_bytes, a_smem_addr, mbar_tma_a, SMEM_A_TILE);
-        tma_load(&params.tensormap_b, n_block, k_bytes, b_smem_addr, mbar_tma_b, SMEM_B_TILE);
+        // Prefetch next tile (if not last iteration)
+        if (k_tile < num_k_tiles - 1) {
+            const int next_k_offset = (k_tile + 1) * MMA_K;
+            const int next_k_bytes = next_k_offset / 2;
+            tma_load(&params.tensormap_a, m_block, next_k_bytes, a_smem_addr[next], mbar_tma_a[next], SMEM_A_TILE);
+            tma_load(&params.tensormap_b, n_block, next_k_bytes, b_smem_addr[next], mbar_tma_b[next], SMEM_B_TILE);
+            load_scales_async_to_smem(params, m_block, n_block, next_k_offset, sfa_smem_addr[next], sfb_smem_addr[next]);
+        }
 
-        // Async load scales to smem while TMA loads A/B
-        load_scales_async_to_smem(params, m_block, n_block, k_offset, sfa_smem_addr, sfb_smem_addr);
+        // Wait for current tile's TMA loads
+        wait_tma_both(mbar_tma_a[curr], tma_phase_a[curr], mbar_tma_b[curr], tma_phase_b[curr]);
+
+        // Wait for current tile's scale loads (allow 1 group in flight if prefetching)
+        wait_scales_async(k_tile < num_k_tiles - 1 ? 1 : 0);
         __syncthreads();
 
-        wait_tma_both(mbar_tma_a, tma_phase_a, mbar_tma_b, tma_phase_b);
-
-        // Both A and B use 32B swizzle (mode 6)
-        uint64_t a_desc = make_smem_desc(a_smem, 16, 256, 6);
-        uint64_t b_desc = make_smem_desc(b_smem, 16, 256, 6);
+        // Build descriptors for current buffer
+        uint64_t a_desc = make_smem_desc(a_smem[curr], 16, 256, 6);
+        uint64_t b_desc = make_smem_desc(b_smem[curr], 16, 256, 6);
 
         // Copy scales from smem to tmem
-        copy_scales_smem_to_tmem(sfa_smem_addr, sfb_smem_addr, tmem_sfa, tmem_sfb);
+        copy_scales_smem_to_tmem(sfa_smem_addr[curr], sfb_smem_addr[curr], tmem_sfa, tmem_sfb);
         __syncthreads();
-
+        // Issue MMA and wait
         issue_mma(tmem_d, a_desc, b_desc, idesc, tmem_sfa, tmem_sfb, mbar_mma, k_tile > 0);
         wait_mma(mbar_mma, mma_phase);
-        __syncthreads();
+
     }
 
     load_accum_and_store(params, m_block, n_block, tmem_d);
@@ -464,7 +512,7 @@ torch::Tensor cuda_nvfp4_gemm_tcgen05(
 """
 
 nvfp4_tcgen05_module = load_inline(
-    name="nvfp4_tcgen05_gemm_tma_both_32b",
+    name="nvfp4_tcgen05_gemm_double_buffered",
     cpp_sources=[cpp_src],
     cuda_sources=[cuda_src],
     functions=["cuda_nvfp4_gemm_tcgen05"],
