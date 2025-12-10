@@ -120,6 +120,40 @@ __device__ __forceinline__ void wait_tma(uint32_t mbar_smem, int& phase)
     phase ^= 1;
 }
 
+__device__ __forceinline__ void wait_tma_both(
+    uint32_t mbar_a, int& phase_a, uint32_t mbar_b, int& phase_b)
+{
+    uint32_t done_a = 0, done_b = 0;
+    while (!done_a || !done_b) {
+        if (!done_a) {
+            asm volatile(
+                "{"
+                ".reg .pred p;"
+                "mbarrier.try_wait.parity.shared::cta.b64 p, [%1], %2;"
+                "selp.u32 %0, 1, 0, p;"
+                "}"
+                : "=r"(done_a)
+                : "r"(mbar_a), "r"(phase_a)
+                : "memory"
+            );
+        }
+        if (!done_b) {
+            asm volatile(
+                "{"
+                ".reg .pred p;"
+                "mbarrier.try_wait.parity.shared::cta.b64 p, [%1], %2;"
+                "selp.u32 %0, 1, 0, p;"
+                "}"
+                : "=r"(done_b)
+                : "r"(mbar_b), "r"(phase_b)
+                : "memory"
+            );
+        }
+    }
+    phase_a ^= 1;
+    phase_b ^= 1;
+}
+
 
 // ============================================================================
 // SETUP / INIT
@@ -314,8 +348,7 @@ gemm_kernel_tcgen05(const __grid_constant__ Gemm_params params)
         // TMA load A and B in parallel with separate mbarriers
         tma_load(&params.tensormap_a, m_block, k_bytes, a_smem_addr, mbar_tma_a, SMEM_A_TILE);
         tma_load(&params.tensormap_b, n_block, k_bytes, b_smem_addr, mbar_tma_b, SMEM_B_TILE);
-        wait_tma(mbar_tma_a, tma_phase_a);
-        wait_tma(mbar_tma_b, tma_phase_b);
+        wait_tma_both(mbar_tma_a, tma_phase_a, mbar_tma_b, tma_phase_b);
         __syncthreads();
 
         // Both A and B use 32B swizzle (mode 6)
