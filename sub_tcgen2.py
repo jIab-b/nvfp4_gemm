@@ -28,31 +28,18 @@ cuda_src = """
 // ============================================================================
 static constexpr int MMA_M = 128;
 static constexpr int MMA_N = 64;
-static constexpr int MMA_K = 64;
+static constexpr int MMA_K = 64;  // 64 FP4 = 32 bytes
 static constexpr int WARPS_PER_CTA = 4;
 static constexpr int THREADS_PER_WARP = 32;
 static constexpr int TMEM_COLS = 128;
 
-#define SMEM_A_TILE      (MMA_M * MMA_K / 2)  // 4096 bytes
-#define SMEM_B_TILE      (MMA_N * MMA_K / 2)  // 2048 bytes
-
-// Mbarrier offsets (8-byte aligned)
-#define SMEM_OFF_MBAR_MMA   8      // mbarrier for MMA completion
-#define SMEM_OFF_MBAR_TMA   16     // mbarrier for TMA completion
-
-// Tile storage (1024-byte aligned for TMA)
-#define SMEM_OFF_TILES      1024
-#define SMEM_OFF_A_TILE     SMEM_OFF_TILES
-#define SMEM_OFF_B_TILE     (SMEM_OFF_TILES + SMEM_A_TILE)
-
-// Temp buffer for TMA (contiguous layout before interleave)
-#define SMEM_OFF_TMA_TEMP   (SMEM_OFF_B_TILE + SMEM_B_TILE)
-#define SMEM_OFF_TMA_A      SMEM_OFF_TMA_TEMP
-#define SMEM_OFF_TMA_B      (SMEM_OFF_TMA_TEMP + SMEM_A_TILE)
-
-#define SMEM_TOTAL          (SMEM_OFF_TMA_B + SMEM_B_TILE)
-
-#define BYTES_PER_ROW (MMA_K / 2)  // 32 bytes per row
+// 32B swizzle: 8 rows x 32 bytes = 256 byte atom, MMA_M/8 = 16 atoms
+#define SMEM_A_TILE      (MMA_M * 32)   // 128 rows * 32 bytes = 4096
+#define SMEM_B_TILE      (MMA_N * MMA_K / 2)  // 64 * 32 = 2048
+#define SMEM_OFF_MBAR_MMA   8
+#define SMEM_OFF_MBAR_TMA   16
+#define SMEM_OFF_TILES   256  // 256B alignment for 32B swizzle
+#define SMEM_TOTAL       (SMEM_OFF_TILES + SMEM_A_TILE + SMEM_B_TILE)
 
 struct Gemm_params {
     int M, N, K;
@@ -94,44 +81,21 @@ __device__ __forceinline__ uint32_t make_mxf4_idesc(int M_tile, int N_tile)
 }
 
 // ============================================================================
-// TMA BULK LOAD using tensormap - single instruction loads entire tile
+// TMA BULK LOAD with 32B hardware swizzle
 // ============================================================================
-__device__ __forceinline__ void tma_load_a_bulk(
-    const CUtensorMap* tensormap, int m_block, int k_offset,
-    uint32_t smem_addr, uint32_t mbar_smem)
+__device__ __forceinline__ void tma_load(
+    const CUtensorMap* tensormap, int row_block, int k_byte_offset,
+    uint32_t smem_addr, uint32_t mbar_smem, int tile_bytes)
 {
     if (threadIdx.x == 0) {
         asm volatile(
             "mbarrier.arrive.expect_tx.shared::cta.b64 _, [%0], %1;"
-            :: "r"(mbar_smem), "r"(SMEM_A_TILE) : "memory"
+            :: "r"(mbar_smem), "r"(tile_bytes) : "memory"
         );
-
-        // 2D tensor copy: coords are (k_offset_bytes, m_block)
-        int k_bytes = k_offset / 2;  // FP4 = 0.5 bytes per element
         asm volatile(
             "cp.async.bulk.tensor.2d.shared::cluster.global.mbarrier::complete_tx::bytes"
             " [%0], [%1, {%2, %3}], [%4];"
-            :: "r"(smem_addr), "l"(tensormap), "r"(k_bytes), "r"(m_block), "r"(mbar_smem)
-            : "memory"
-        );
-    }
-}
-
-__device__ __forceinline__ void tma_load_b_bulk(
-    const CUtensorMap* tensormap, int n_block, int k_offset,
-    uint32_t smem_addr, uint32_t mbar_smem)
-{
-    if (threadIdx.x == 0) {
-        asm volatile(
-            "mbarrier.arrive.expect_tx.shared::cta.b64 _, [%0], %1;"
-            :: "r"(mbar_smem), "r"(SMEM_B_TILE) : "memory"
-        );
-
-        int k_bytes = k_offset / 2;
-        asm volatile(
-            "cp.async.bulk.tensor.2d.shared::cluster.global.mbarrier::complete_tx::bytes"
-            " [%0], [%1, {%2, %3}], [%4];"
-            :: "r"(smem_addr), "l"(tensormap), "r"(k_bytes), "r"(n_block), "r"(mbar_smem)
+            :: "r"(smem_addr), "l"(tensormap), "r"(k_byte_offset), "r"(row_block), "r"(mbar_smem)
             : "memory"
         );
     }
@@ -155,48 +119,6 @@ __device__ __forceinline__ void wait_tma(uint32_t mbar_smem, int& phase)
     phase ^= 1;
 }
 
-// ============================================================================
-// INTERLEAVE - Transform from contiguous temp to interleaved final layout
-// ============================================================================
-__device__ __forceinline__ void interleave_a(
-    const uint8_t* __restrict__ temp_smem,
-    uint8_t* __restrict__ final_smem)
-{
-    for (int i = threadIdx.x; i < MMA_M * MMA_K / 2; i += blockDim.x) {
-        int m = i / (MMA_K / 2);
-        int k_byte = i % (MMA_K / 2);
-
-        uint8_t val = temp_smem[m * BYTES_PER_ROW + k_byte];
-
-        int block_row = m / 8;
-        int inner_row = m % 8;
-        int k_group = k_byte / 16;
-        int k_inner = k_byte % 16;
-        int smem_offset = inner_row * 16 + k_group * 128 + block_row * 256 + k_inner;
-
-        final_smem[smem_offset] = val;
-    }
-}
-
-__device__ __forceinline__ void interleave_b(
-    const uint8_t* __restrict__ temp_smem,
-    uint8_t* __restrict__ final_smem)
-{
-    for (int i = threadIdx.x; i < MMA_N * MMA_K / 2; i += blockDim.x) {
-        int n = i / (MMA_K / 2);
-        int k_byte = i % (MMA_K / 2);
-
-        uint8_t val = temp_smem[n * BYTES_PER_ROW + k_byte];
-
-        int block_row = n / 8;
-        int inner_row = n % 8;
-        int k_group = k_byte / 16;
-        int k_inner = k_byte % 16;
-        int smem_offset = inner_row * 16 + k_group * 128 + block_row * 256 + k_inner;
-
-        final_smem[smem_offset] = val;
-    }
-}
 
 // ============================================================================
 // SETUP / INIT
@@ -212,11 +134,9 @@ __device__ __forceinline__ void init_tmem_and_mbars(
         );
     }
     __syncthreads();
-
     tmem_d = *reinterpret_cast<uint32_t*>(smem);
     tmem_sfa = tmem_d + MMA_N;
     tmem_sfb = tmem_d + MMA_N + 4;
-
     if (threadIdx.x == 0) {
         asm volatile("mbarrier.init.shared::cta.b64 [%0], %1;"
             :: "r"(mbar_mma), "r"(1) : "memory");
@@ -269,9 +189,9 @@ __device__ __forceinline__ void load_scales_to_tmem(
 // ============================================================================
 __device__ __forceinline__ void issue_mma(
     uint32_t tmem_d, uint64_t a_desc, uint64_t b_desc, uint32_t idesc,
-    uint32_t tmem_sfa, uint32_t tmem_sfb, uint32_t mbar_smem, int k_tile)
+    uint32_t tmem_sfa, uint32_t tmem_sfb, uint32_t mbar_smem, bool accumulate)
 {
-    uint32_t enable_d = (k_tile > 0) ? 1 : 0;
+    uint32_t enable_d = accumulate ? 1 : 0;
     if (threadIdx.x == 0) {
         asm volatile(
             "{"
@@ -359,7 +279,7 @@ __device__ __forceinline__ void dealloc_tmem(uint32_t tmem_d)
 __global__ void __launch_bounds__(WARPS_PER_CTA * THREADS_PER_WARP)
 gemm_kernel_tcgen05(const __grid_constant__ Gemm_params params)
 {
-    __shared__ __align__(1024) char smem[SMEM_TOTAL];
+    __shared__ __align__(256) char smem[SMEM_TOTAL];
 
     const uint32_t smem_base = __cvta_generic_to_shared(smem);
     const uint32_t mbar_mma = smem_base + SMEM_OFF_MBAR_MMA;
@@ -377,39 +297,31 @@ gemm_kernel_tcgen05(const __grid_constant__ Gemm_params params)
     int mma_phase = 0;
     int tma_phase = 0;
 
-    // Pointers to smem regions
-    uint8_t* a_final = reinterpret_cast<uint8_t*>(smem + SMEM_OFF_A_TILE);
-    uint8_t* b_final = reinterpret_cast<uint8_t*>(smem + SMEM_OFF_B_TILE);
-    uint8_t* a_temp = reinterpret_cast<uint8_t*>(smem + SMEM_OFF_TMA_A);
-    uint8_t* b_temp = reinterpret_cast<uint8_t*>(smem + SMEM_OFF_TMA_B);
-    uint32_t a_temp_addr = smem_base + SMEM_OFF_TMA_A;
-    uint32_t b_temp_addr = smem_base + SMEM_OFF_TMA_B;
+    uint8_t* a_smem = reinterpret_cast<uint8_t*>(smem + SMEM_OFF_TILES);
+    uint8_t* b_smem = reinterpret_cast<uint8_t*>(smem + SMEM_OFF_TILES + SMEM_A_TILE);
+    uint32_t a_smem_addr = smem_base + SMEM_OFF_TILES;
+    uint32_t b_smem_addr = smem_base + SMEM_OFF_TILES + SMEM_A_TILE;
 
     for (int k_tile = 0; k_tile < num_k_tiles; k_tile++) {
         const int k_offset = k_tile * MMA_K;
+        const int k_bytes = k_offset / 2;
 
-        // TMA bulk load A and B (no swizzle - contiguous layout)
-        tma_load_a_bulk(&params.tensormap_a, m_block, k_offset, a_temp_addr, mbar_tma);
+        // TMA load A and B with 32B hardware swizzle (both use same mbar, sequential)
+        tma_load(&params.tensormap_a, m_block, k_bytes, a_smem_addr, mbar_tma, SMEM_A_TILE);
         wait_tma(mbar_tma, tma_phase);
 
-        tma_load_b_bulk(&params.tensormap_b, n_block, k_offset, b_temp_addr, mbar_tma);
+        tma_load(&params.tensormap_b, n_block, k_bytes, b_smem_addr, mbar_tma, SMEM_B_TILE);
         wait_tma(mbar_tma, tma_phase);
-
-        // Interleave from temp to final (all threads)
-        interleave_a(a_temp, a_final);
-        interleave_b(b_temp, b_final);
         __syncthreads();
 
-        // Build descriptors for interleaved smem
-        uint64_t a_desc = make_smem_desc(a_final, 128, 256, 0);
-        uint64_t b_desc = make_smem_desc(b_final, 128, 256, 0);
+        // Both A and B use 32B swizzle (mode 6)
+        uint64_t a_desc = make_smem_desc(a_smem, 16, 256, 6);
+        uint64_t b_desc = make_smem_desc(b_smem, 16, 256, 6);
 
-        // Load scales to tensor memory
         load_scales_to_tmem(params, m_block, n_block, k_offset, tmem_sfa, tmem_sfb);
         __syncthreads();
 
-        // Issue MMA
-        issue_mma(tmem_d, a_desc, b_desc, idesc, tmem_sfa, tmem_sfb, mbar_mma, k_tile);
+        issue_mma(tmem_d, a_desc, b_desc, idesc, tmem_sfa, tmem_sfb, mbar_mma, k_tile > 0);
         wait_mma(mbar_mma, mma_phase);
         __syncthreads();
     }
@@ -419,37 +331,27 @@ gemm_kernel_tcgen05(const __grid_constant__ Gemm_params params)
 }
 
 // ============================================================================
-// HOST: Create TensorMap for TMA
+// HOST: Create TensorMap with 32B swizzle
 // ============================================================================
 void create_tensormap(CUtensorMap* tensormap, const void* data_ptr,
                       int rows, int k_bytes, int row_stride_bytes, int box_rows)
 {
-    // Tensor dimensions: [K_bytes, M/N rows]
     uint64_t globalDim[2] = {(uint64_t)k_bytes, (uint64_t)rows};
-
-    // Global strides (in bytes): stride for each dimension
-    // Dim 0 (K) has implicit stride of 1 byte
-    // Dim 1 (M/N) has stride = row_stride_bytes
-    uint64_t globalStride[1] = {(uint64_t)row_stride_bytes};  // stride for dim 1
-
-    // Box dimensions: what each TMA load fetches
-    // 32 bytes in K (MMA_K/2), box_rows in M/N dimension
-    uint32_t boxDim[2] = {32, (uint32_t)box_rows};
-
-    // Element strides within box (1 = contiguous)
+    uint64_t globalStride[1] = {(uint64_t)row_stride_bytes};
+    uint32_t boxDim[2] = {32, (uint32_t)box_rows};  // 32 bytes for 32B swizzle
     uint32_t elementStride[2] = {1, 1};
 
     CUresult result = cuTensorMapEncodeTiled(
         tensormap,
-        CU_TENSOR_MAP_DATA_TYPE_UINT8,  // FP4 packed as bytes
-        2,                               // 2D tensor
+        CU_TENSOR_MAP_DATA_TYPE_UINT8,
+        2,
         const_cast<void*>(data_ptr),
         globalDim,
         globalStride,
         boxDim,
         elementStride,
         CU_TENSOR_MAP_INTERLEAVE_NONE,
-        CU_TENSOR_MAP_SWIZZLE_NONE,      // No swizzle - copy as-is
+        CU_TENSOR_MAP_SWIZZLE_32B,  // 32B hardware swizzle
         CU_TENSOR_MAP_L2_PROMOTION_NONE,
         CU_TENSOR_MAP_FLOAT_OOB_FILL_NONE
     );
@@ -468,28 +370,21 @@ torch::Tensor cuda_nvfp4_gemm_tcgen05(
     torch::Tensor C)
 {
     const int M = static_cast<int>(A.size(0));
-    const int K = static_cast<int>(A.size(1)) * 2;  // FP4: 2 elements per byte
+    const int K = static_cast<int>(A.size(1)) * 2;
     const int N = static_cast<int>(B.size(0));
     const int K_bytes = K / 2;
 
     Gemm_params params;
-    params.M = M;
-    params.N = N;
-    params.K = K;
+    params.M = M; params.N = N; params.K = K;
     params.sfa_ptr = SFA.data_ptr();
     params.sfb_ptr = SFB.data_ptr();
     params.c_ptr = reinterpret_cast<__half*>(C.data_ptr());
     params.sfa_row_stride = SFA.stride(0);
     params.sfb_row_stride = SFB.stride(0);
 
-    // Create tensormaps for A and B
-    // A: M rows x K_bytes, stride = A.stride(0) bytes, box = 128 rows
-    create_tensormap(&params.tensormap_a, A.data_ptr(),
-                     M, K_bytes, A.stride(0), MMA_M);
-
-    // B: N rows x K_bytes, stride = B.stride(0) bytes, box = 64 rows
-    create_tensormap(&params.tensormap_b, B.data_ptr(),
-                     N, K_bytes, B.stride(0), MMA_N);
+    // Create tensormaps for A and B with 32B swizzle
+    create_tensormap(&params.tensormap_a, A.data_ptr(), M, K_bytes, A.stride(0), MMA_M);
+    create_tensormap(&params.tensormap_b, B.data_ptr(), N, K_bytes, B.stride(0), MMA_N);
 
     dim3 grid_dim((N + MMA_N - 1) / MMA_N, (M + MMA_M - 1) / MMA_M, 1);
     dim3 block_dim(WARPS_PER_CTA * THREADS_PER_WARP);
@@ -500,7 +395,7 @@ torch::Tensor cuda_nvfp4_gemm_tcgen05(
 """
 
 nvfp4_tcgen05_module = load_inline(
-    name="nvfp4_tcgen05_gemm_v4_tma_bulk",
+    name="nvfp4_tcgen05_gemm_tma_both_32b",
     cpp_sources=[cpp_src],
     cuda_sources=[cuda_src],
     functions=["cuda_nvfp4_gemm_tcgen05"],
