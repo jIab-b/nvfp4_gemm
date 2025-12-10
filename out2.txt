@@ -1,5 +1,5 @@
 "**NVIDIA on GitHub ✅ success**
-> Workflow [20085144707](<https://github.com/gpu-mode/discord-cluster-manager/actions/runs/20085144707>) completed
+> Workflow [20086887072](<https://github.com/gpu-mode/discord-cluster-manager/actions/runs/20086887072>) completed
 > Downloading artifacts... done
 > ✅ Benchmarking successful
 
@@ -14,7 +14,7 @@ Running on:
 ## Benchmarks:
 ```
 k: 16384; l: 1; m: 128; n: 7168; seed: 1111
- ⏱ 259 ± 0.0 µs
+ ⏱ 259 ± 0.1 µs
  ⚡ 259 µs 🐌 259 µs
 
 k: 7168; l: 1; m: 128; n: 4096; seed: 1111
@@ -22,6 +22,6 @@ k: 7168; l: 1; m: 128; n: 4096; seed: 1111
  ⚡ 112 µs 🐌 113 µs
 
 k: 2048; l: 1; m: 128; n: 7168; seed: 1111
- ⏱ 44.8 ± 0.04 µs
- ⚡ 44.7 µs 🐌 44.9 µs
+ ⏱ 44.4 ± 0.04 µs
+ ⚡ 44.3 µs 🐌 44.5 µs
 ```"

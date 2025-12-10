@@ -102,23 +102,7 @@ __device__ __forceinline__ void tma_load(
     }
 }
 
-__device__ __forceinline__ void wait_tma(uint32_t mbar_smem, int& phase)
-{
-    uint32_t done = 0;
-    while (!done) {
-        asm volatile(
-            "{"
-            ".reg .pred p;"
-            "mbarrier.try_wait.parity.shared::cta.b64 p, [%1], %2;"
-            "selp.u32 %0, 1, 0, p;"
-            "}"
-            : "=r"(done)
-            : "r"(mbar_smem), "r"(phase)
-            : "memory"
-        );
-    }
-    phase ^= 1;
-}
+
 
 __device__ __forceinline__ void wait_tma_both(
     uint32_t mbar_a, int& phase_a, uint32_t mbar_b, int& phase_b)
@@ -196,8 +180,10 @@ __device__ __forceinline__ void load_scales_to_tmem(
     int m_row = m_block + warp_id * 32 + lane_id;
 
     const uint8_t* sfa_base = reinterpret_cast<const uint8_t*>(params.sfa_ptr);
-    uint32_t sfa_val = *reinterpret_cast<const uint32_t*>(
-        sfa_base + m_row * params.sfa_row_stride + sf_k_idx);
+    uint64_t sfa_addr = reinterpret_cast<uint64_t>(sfa_base + m_row * params.sfa_row_stride + sf_k_idx);
+    uint32_t sfa_val;
+    // SFA: unique per M row, evict after use
+    asm volatile("ld.global.cs.u32 %0, [%1];" : "=r"(sfa_val) : "l"(sfa_addr) : "memory");
 
     asm volatile(
         "tcgen05.st.sync.aligned.32x32b.x1.b32 [%0], {%1};"
@@ -205,10 +191,12 @@ __device__ __forceinline__ void load_scales_to_tmem(
     );
 
     const uint8_t* sfb_base = reinterpret_cast<const uint8_t*>(params.sfb_ptr);
-    uint32_t sfb_val0 = *reinterpret_cast<const uint32_t*>(
-        sfb_base + (n_block + lane_id) * params.sfb_row_stride + sf_k_idx);
-    uint32_t sfb_val1 = *reinterpret_cast<const uint32_t*>(
-        sfb_base + (n_block + lane_id + 32) * params.sfb_row_stride + sf_k_idx);
+    uint64_t sfb_addr0 = reinterpret_cast<uint64_t>(sfb_base + (n_block + lane_id) * params.sfb_row_stride + sf_k_idx);
+    uint64_t sfb_addr1 = reinterpret_cast<uint64_t>(sfb_base + (n_block + lane_id + 32) * params.sfb_row_stride + sf_k_idx);
+    uint32_t sfb_val0, sfb_val1;
+    // SFB: reused across M blocks, keep in L2
+    asm volatile("ld.global.L2::128B.u32 %0, [%1];" : "=r"(sfb_val0) : "l"(sfb_addr0) : "memory");
+    asm volatile("ld.global.L2::128B.u32 %0, [%1];" : "=r"(sfb_val1) : "l"(sfb_addr1) : "memory");
 
     asm volatile(
         "tcgen05.st.sync.aligned.32x32b.x1.b32 [%0], {%1};"
