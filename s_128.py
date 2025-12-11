@@ -267,13 +267,10 @@ __device__ __forceinline__ void copy_scales_smem_to_tmem(
 {
     const int lane_id = threadIdx.x % 32;
 
-    // Each row has 16 bytes (4 k-tiles × 4 bytes each)
-    // Offset by k_tile_in_group * 4 bytes to get the right 4 bytes
+
     const int k_byte_offset = k_tile_in_group * 4;
 
-    // SFA: 128 rows of scale data for M=128
-    // All warps load the same 32 values per column and write to the SAME column
-    // This replicates each group of 32 scales across all 128 tmem lanes (4 warp partitions)
+
     #pragma unroll
     for (int col = 0; col < 4; col++) {
         uint32_t sfa_saddr = sfa_smem_addr + (col * 32 + lane_id) * 16 + k_byte_offset;
@@ -285,9 +282,7 @@ __device__ __forceinline__ void copy_scales_smem_to_tmem(
         );
     }
 
-    // SFB: 128 rows of scale data for N=128
-    // All warps load the same 32 values per column and write to the SAME column
-    // This replicates each group of 32 scales across all 128 tmem lanes (4 warp partitions)
+
     #pragma unroll
     for (int col = 0; col < 4; col++) {
         uint32_t sfb_saddr = sfb_smem_addr + (col * 32 + lane_id) * 16 + k_byte_offset;
