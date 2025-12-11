@@ -260,32 +260,38 @@ __device__ __forceinline__ void copy_scales_smem_to_tmem(
     int k_tile_in_group)  // 0-3: which k-tile within the loaded group of 4
 {
     const int lane_id = threadIdx.x % 32;
-    const int warp_id = threadIdx.x / 32;
 
     // Each row has 16 bytes (4 k-tiles × 4 bytes each)
     // Offset by k_tile_in_group * 4 bytes to get the right 4 bytes
     const int k_byte_offset = k_tile_in_group * 4;
 
-    // Load SFA from smem and store to tmem (128 threads load 128 rows)
-    // Row layout: 16 bytes per row, we want bytes [k_byte_offset, k_byte_offset+4)
-    uint32_t sfa_saddr = sfa_smem_addr + (warp_id * 32 + lane_id) * 16 + k_byte_offset;
-    uint32_t sfa_val;
-    asm volatile("ld.shared.u32 %0, [%1];" : "=r"(sfa_val) : "r"(sfa_saddr) : "memory");
+    // SFA: 128 rows of scale data for M=128
+    // All warps load the same 32 values per column and write to the SAME column
+    // This replicates each group of 32 scales across all 128 tmem lanes (4 warp partitions)
+    #pragma unroll
+    for (int col = 0; col < 4; col++) {
+        uint32_t sfa_saddr = sfa_smem_addr + (col * 32 + lane_id) * 16 + k_byte_offset;
+        uint32_t sfa_val;
+        asm volatile("ld.shared.u32 %0, [%1];" : "=r"(sfa_val) : "r"(sfa_saddr) : "memory");
+        asm volatile(
+            "tcgen05.st.sync.aligned.32x32b.x1.b32 [%0], {%1};"
+            :: "r"(tmem_sfa + col), "r"(sfa_val) : "memory"
+        );
+    }
 
-    asm volatile(
-        "tcgen05.st.sync.aligned.32x32b.x1.b32 [%0], {%1};"
-        :: "r"(tmem_sfa + warp_id), "r"(sfa_val) : "memory"
-    );
-
-    // Load SFB from smem and store to tmem (128 threads load 128 rows - same as SFA now)
-    uint32_t sfb_saddr = sfb_smem_addr + (warp_id * 32 + lane_id) * 16 + k_byte_offset;
-    uint32_t sfb_val;
-    asm volatile("ld.shared.u32 %0, [%1];" : "=r"(sfb_val) : "r"(sfb_saddr) : "memory");
-
-    asm volatile(
-        "tcgen05.st.sync.aligned.32x32b.x1.b32 [%0], {%1};"
-        :: "r"(tmem_sfb + warp_id), "r"(sfb_val) : "memory"
-    );
+    // SFB: 128 rows of scale data for N=128
+    // All warps load the same 32 values per column and write to the SAME column
+    // This replicates each group of 32 scales across all 128 tmem lanes (4 warp partitions)
+    #pragma unroll
+    for (int col = 0; col < 4; col++) {
+        uint32_t sfb_saddr = sfb_smem_addr + (col * 32 + lane_id) * 16 + k_byte_offset;
+        uint32_t sfb_val;
+        asm volatile("ld.shared.u32 %0, [%1];" : "=r"(sfb_val) : "r"(sfb_saddr) : "memory");
+        asm volatile(
+            "tcgen05.st.sync.aligned.32x32b.x1.b32 [%0], {%1};"
+            :: "r"(tmem_sfb + col), "r"(sfb_val) : "memory"
+        );
+    }
 
     asm volatile("tcgen05.wait::st.sync.aligned;" ::: "memory");
 }
