@@ -266,34 +266,50 @@ __device__ __forceinline__ void copy_scales_smem_to_tmem(
     int k_tile_in_group)  // 0-3: which k-tile within the loaded group of 4
 {
     const int lane_id = threadIdx.x % 32;
+    const int warp_id = threadIdx.x / 32;
 
-
+    // Each row has 16 bytes (4 k-tiles × 4 bytes each)
+    // Offset by k_tile_in_group * 4 bytes to get the right 4 bytes
     const int k_byte_offset = k_tile_in_group * 4;
 
+    // Load SFA from smem and store to tmem (warp-based indexing)
+    // Row layout: 16 bytes per row, we want bytes [k_byte_offset, k_byte_offset+4)
+    uint32_t sfa_saddr = sfa_smem_addr + (warp_id * 32 + lane_id) * 16 + k_byte_offset;
+    uint32_t sfa_val;
+    asm volatile("ld.shared.u32 %0, [%1];" : "=r"(sfa_val) : "r"(sfa_saddr) : "memory");
 
-    #pragma unroll
-    for (int col = 0; col < 4; col++) {
-        uint32_t sfa_saddr = sfa_smem_addr + (col * 32 + lane_id) * 16 + k_byte_offset;
-        uint32_t sfa_val;
-        asm volatile("ld.shared.u32 %0, [%1];" : "=r"(sfa_val) : "r"(sfa_saddr) : "memory");
-        asm volatile(
-            "tcgen05.st.sync.aligned.32x32b.x1.b32 [%0], {%1};"
-            :: "r"(tmem_sfa + col), "r"(sfa_val) : "memory"
-        );
-    }
+    asm volatile(
+        "tcgen05.st.sync.aligned.32x32b.x1.b32 [%0], {%1};"
+        :: "r"(tmem_sfa + warp_id), "r"(sfa_val) : "memory"
+    );
 
+    // Load SFB from smem and store to tmem (4 loads to cover 128 rows)
+    uint32_t sfb_saddr0 = sfb_smem_addr + lane_id * 16 + k_byte_offset;
+    uint32_t sfb_saddr1 = sfb_smem_addr + (lane_id + 32) * 16 + k_byte_offset;
+    uint32_t sfb_saddr2 = sfb_smem_addr + (lane_id + 64) * 16 + k_byte_offset;
+    uint32_t sfb_saddr3 = sfb_smem_addr + (lane_id + 96) * 16 + k_byte_offset;
+    uint32_t sfb_val0, sfb_val1, sfb_val2, sfb_val3;
+    asm volatile("ld.shared.u32 %0, [%1];" : "=r"(sfb_val0) : "r"(sfb_saddr0) : "memory");
+    asm volatile("ld.shared.u32 %0, [%1];" : "=r"(sfb_val1) : "r"(sfb_saddr1) : "memory");
+    asm volatile("ld.shared.u32 %0, [%1];" : "=r"(sfb_val2) : "r"(sfb_saddr2) : "memory");
+    asm volatile("ld.shared.u32 %0, [%1];" : "=r"(sfb_val3) : "r"(sfb_saddr3) : "memory");
 
-    #pragma unroll
-    for (int col = 0; col < 4; col++) {
-        uint32_t sfb_saddr = sfb_smem_addr + (col * 32 + lane_id) * 16 + k_byte_offset;
-        uint32_t sfb_val;
-        asm volatile("ld.shared.u32 %0, [%1];" : "=r"(sfb_val) : "r"(sfb_saddr) : "memory");
-        asm volatile(
-            "tcgen05.st.sync.aligned.32x32b.x1.b32 [%0], {%1};"
-            :: "r"(tmem_sfb + col), "r"(sfb_val) : "memory"
-        );
-    }
-
+    asm volatile(
+        "tcgen05.st.sync.aligned.32x32b.x1.b32 [%0], {%1};"
+        :: "r"(tmem_sfb), "r"(sfb_val0) : "memory"
+    );
+    asm volatile(
+        "tcgen05.st.sync.aligned.32x32b.x1.b32 [%0], {%1};"
+        :: "r"(tmem_sfb + 1), "r"(sfb_val1) : "memory"
+    );
+    asm volatile(
+        "tcgen05.st.sync.aligned.32x32b.x1.b32 [%0], {%1};"
+        :: "r"(tmem_sfb + 2), "r"(sfb_val2) : "memory"
+    );
+    asm volatile(
+        "tcgen05.st.sync.aligned.32x32b.x1.b32 [%0], {%1};"
+        :: "r"(tmem_sfb + 3), "r"(sfb_val3) : "memory"
+    );
     asm volatile("tcgen05.wait::st.sync.aligned;" ::: "memory");
 }
 
