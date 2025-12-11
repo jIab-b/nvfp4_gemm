@@ -89,27 +89,6 @@ __device__ __forceinline__ uint32_t make_mxf4_idesc(int M_tile, int N_tile)
     return idesc;
 }
 
-// ============================================================================
-// TMA BULK LOAD with 32B hardware swizzle
-// ============================================================================
-__device__ __forceinline__ void tma_load(
-    const CUtensorMap* tensormap, int row_block, int k_byte_offset,
-    uint32_t smem_addr, uint32_t mbar_smem, int tile_bytes)
-{
-    if (threadIdx.x == 0) {
-        asm volatile(
-            "mbarrier.arrive.expect_tx.shared::cta.b64 _, [%0], %1;"
-            :: "r"(mbar_smem), "r"(tile_bytes) : "memory"
-        );
-        asm volatile(
-            "cp.async.bulk.tensor.2d.shared::cluster.global.mbarrier::complete_tx::bytes"
-            " [%0], [%1, {%2, %3}], [%4];"
-            :: "r"(smem_addr), "l"(tensormap), "r"(k_byte_offset), "r"(row_block), "r"(mbar_smem)
-            : "memory"
-        );
-    }
-}
-
 // Issue 4 TMA loads for 256 K elements (4 x 32 bytes per row x all rows)
 // Each load writes to a separate smem region of (32 bytes * rows)
 __device__ __forceinline__ void tma_load_4x(
@@ -140,42 +119,6 @@ __device__ __forceinline__ void tma_load_4x(
             );
         }
     }
-}
-
-
-
-__device__ __forceinline__ void wait_tma_both(
-    uint32_t mbar_a, int& phase_a, uint32_t mbar_b, int& phase_b)
-{
-    uint32_t done_a = 0, done_b = 0;
-    while (!done_a || !done_b) {
-        if (!done_a) {
-            asm volatile(
-                "{"
-                ".reg .pred p;"
-                "mbarrier.try_wait.parity.shared::cta.b64 p, [%1], %2;"
-                "selp.u32 %0, 1, 0, p;"
-                "}"
-                : "=r"(done_a)
-                : "r"(mbar_a), "r"(phase_a)
-                : "memory"
-            );
-        }
-        if (!done_b) {
-            asm volatile(
-                "{"
-                ".reg .pred p;"
-                "mbarrier.try_wait.parity.shared::cta.b64 p, [%1], %2;"
-                "selp.u32 %0, 1, 0, p;"
-                "}"
-                : "=r"(done_b)
-                : "r"(mbar_b), "r"(phase_b)
-                : "memory"
-            );
-        }
-    }
-    phase_a ^= 1;
-    phase_b ^= 1;
 }
 
 __device__ __forceinline__ void wait_tma_all_four(
