@@ -33,7 +33,7 @@ static constexpr int MMA_K_TILE = 256; // 256 FP4 loaded per TMA (4 MMAs worth)
 static constexpr int K_BLOCKS = 4;     // Number of MMAs per TMA load
 static constexpr int WARPS_PER_CTA = 4;
 static constexpr int THREADS_PER_WARP = 32;
-static constexpr int TMEM_COLS = 256;  // Increased: 128 (acc) + 4 (SFA) + 4 (SFB) + padding
+static constexpr int TMEM_COLS = 136;  // Increased: 128 (acc) + 4 (SFA) + 4 (SFB) + padding
 
 // 32B swizzle: 8 rows x 32 bytes = 256 byte atom
 // Now loading 256 K elements = 128 bytes per row
