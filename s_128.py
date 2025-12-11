@@ -144,11 +144,12 @@ __device__ __forceinline__ void tma_load_4x(
 
 
 
-__device__ __forceinline__ void wait_tma_both(
-    uint32_t mbar_a, int& phase_a, uint32_t mbar_b, int& phase_b)
+__device__ __forceinline__ void wait_tma_all_four(
+    uint32_t mbar_a, int& phase_a, uint32_t mbar_b, int& phase_b,
+    uint32_t mbar_sfa, int& phase_sfa, uint32_t mbar_sfb, int& phase_sfb)
 {
-    uint32_t done_a = 0, done_b = 0;
-    while (!done_a || !done_b) {
+    uint32_t done_a = 0, done_b = 0, done_sfa = 0, done_sfb = 0;
+    while (!done_a || !done_b || !done_sfa || !done_sfb) {
         if (!done_a) {
             asm volatile(
                 "{"
@@ -173,9 +174,35 @@ __device__ __forceinline__ void wait_tma_both(
                 : "memory"
             );
         }
+        if (!done_sfa) {
+            asm volatile(
+                "{"
+                ".reg .pred p;"
+                "mbarrier.try_wait.parity.shared::cta.b64 p, [%1], %2;"
+                "selp.u32 %0, 1, 0, p;"
+                "}"
+                : "=r"(done_sfa)
+                : "r"(mbar_sfa), "r"(phase_sfa)
+                : "memory"
+            );
+        }
+        if (!done_sfb) {
+            asm volatile(
+                "{"
+                ".reg .pred p;"
+                "mbarrier.try_wait.parity.shared::cta.b64 p, [%1], %2;"
+                "selp.u32 %0, 1, 0, p;"
+                "}"
+                : "=r"(done_sfb)
+                : "r"(mbar_sfb), "r"(phase_sfb)
+                : "memory"
+            );
+        }
     }
     phase_a ^= 1;
     phase_b ^= 1;
+    phase_sfa ^= 1;
+    phase_sfb ^= 1;
 }
 
 
@@ -441,9 +468,9 @@ gemm_kernel_tcgen05(const __grid_constant__ Gemm_params params)
                         sfa_smem_addr, sfb_smem_addr,
                         mbar_tma_sfa, mbar_tma_sfb);
 
-        // Wait for all TMA loads
-        wait_tma_both(mbar_tma_a, tma_phase_a, mbar_tma_b, tma_phase_b);
-        wait_tma_both(mbar_tma_sfa, tma_phase_sfa, mbar_tma_sfb, tma_phase_sfb);
+        // Wait for all TMA loads (A, B, SFA, SFB) in parallel
+        wait_tma_all_four(mbar_tma_a, tma_phase_a, mbar_tma_b, tma_phase_b,
+                          mbar_tma_sfa, tma_phase_sfa, mbar_tma_sfb, tma_phase_sfb);
         __syncthreads();
 
         // Inner loop: 4 MMAs per TMA load
