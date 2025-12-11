@@ -89,8 +89,7 @@ __device__ __forceinline__ uint32_t make_mxf4_idesc(int M_tile, int N_tile)
     return idesc;
 }
 
-// Issue 4 TMA loads for 256 K elements (4 x 32 bytes per row x all rows)
-// Each load writes to a separate smem region of (32 bytes * rows)
+
 __device__ __forceinline__ void tma_load_4x(
     const CUtensorMap* tensormap, int row_block, int k_byte_offset_base,
     uint32_t smem_base_addr, uint32_t mbar_smem, int rows)
@@ -105,11 +104,11 @@ __device__ __forceinline__ void tma_load_4x(
             :: "r"(mbar_smem), "r"(total_bytes) : "memory"
         );
 
-        // Issue 4 TMA loads, each to a separate smem region
+
         #pragma unroll
         for (int i = 0; i < 4; i++) {
             int k_byte_offset = k_byte_offset_base + i * 32;
-            // Each chunk goes to a separate region: chunk i → smem_base + i * (32 * rows)
+
             uint32_t smem_addr = smem_base_addr + i * bytes_per_chunk;
             asm volatile(
                 "cp.async.bulk.tensor.2d.shared::cluster.global.mbarrier::complete_tx::bytes"
@@ -217,22 +216,18 @@ __device__ __forceinline__ void init_tmem_and_mbars(
     __syncthreads();
 }
 
-// ============================================================================
-// TMA SCALE LOADING: global -> smem (TMA bulk) -> tmem (tcgen05.st)
-// Loads 16 bytes (4 k-tiles worth) of scales at once
-// ============================================================================
+
 __device__ __forceinline__ void tma_load_scales(
     const CUtensorMap* tensormap_sfa, const CUtensorMap* tensormap_sfb,
     int m_block, int n_block, int scale_k_group,
     uint32_t sfa_smem_addr, uint32_t sfb_smem_addr,
     uint32_t mbar_sfa, uint32_t mbar_sfb)
 {
-    // scale_k_group is which group of 4 k-tiles (each group = 16 bytes of scales)
-    // k_byte_offset = scale_k_group * 16
+
     const int sf_k_bytes = scale_k_group * 16;
 
     if (threadIdx.x == 0) {
-        // SFA: 128 rows * 16 bytes = 2048 bytes
+
         asm volatile(
             "mbarrier.arrive.expect_tx.shared::cta.b64 _, [%0], %1;"
             :: "r"(mbar_sfa), "r"(SMEM_SFA_TILE) : "memory"
@@ -244,7 +239,7 @@ __device__ __forceinline__ void tma_load_scales(
             : "memory"
         );
 
-        // SFB: 64 rows * 16 bytes = 1024 bytes
+
         asm volatile(
             "mbarrier.arrive.expect_tx.shared::cta.b64 _, [%0], %1;"
             :: "r"(mbar_sfb), "r"(SMEM_SFB_TILE) : "memory"
@@ -266,8 +261,6 @@ __device__ __forceinline__ void copy_scales_smem_to_tmem(
     const int lane_id = threadIdx.x % 32;
     const int warp_id = threadIdx.x / 32;
 
-    // Each row has 16 bytes (4 k-tiles × 4 bytes each)
-    // Offset by k_tile_in_group * 4 bytes to get the right 4 bytes
     const int k_byte_offset = k_tile_in_group * 4;
 
     // Load SFA from smem and store to tmem
@@ -281,7 +274,7 @@ __device__ __forceinline__ void copy_scales_smem_to_tmem(
         :: "r"(tmem_sfa + warp_id), "r"(sfa_val) : "memory"
     );
 
-    // Load SFB from smem and store to tmem (all 128 threads, 2 loads per 64 threads)
+
     uint32_t sfb_saddr0 = sfb_smem_addr + lane_id * 16 + k_byte_offset;
     uint32_t sfb_saddr1 = sfb_smem_addr + (lane_id + 32) * 16 + k_byte_offset;
     uint32_t sfb_val0, sfb_val1;
@@ -426,7 +419,6 @@ gemm_kernel_tcgen05(const __grid_constant__ Gemm_params params)
     uint32_t sfa_smem_addr = smem_base + SMEM_OFF_SFA;
     uint32_t sfb_smem_addr = smem_base + SMEM_OFF_SFB;
 
-    // Size of each K chunk in smem (32 bytes * rows)
     const int a_chunk_bytes = 32 * MMA_M;  // 32 * 128 = 4096
     const int b_chunk_bytes = 32 * MMA_N;  // 32 * 64 = 2048
 
@@ -434,37 +426,30 @@ gemm_kernel_tcgen05(const __grid_constant__ Gemm_params params)
         const int k_offset = k_tile * MMA_K_TILE;
         const int k_bytes = k_offset / 2;  // 256 FP4 = 128 bytes
 
-        // TMA load A and B (4 x 32-byte chunks each)
         tma_load_4x(&params.tensormap_a, m_block, k_bytes, a_smem_addr, mbar_tma_a, MMA_M);
         tma_load_4x(&params.tensormap_b, n_block, k_bytes, b_smem_addr, mbar_tma_b, MMA_N);
 
-        // TMA load scales (16 bytes = 4 k-tiles worth, aligned with our 256 K tile)
         tma_load_scales(&params.tensormap_sfa, &params.tensormap_sfb,
                         m_block, n_block, k_tile,
                         sfa_smem_addr, sfb_smem_addr,
                         mbar_tma_sfa, mbar_tma_sfb);
 
-        // Wait for all TMA loads (A, B, SFA, SFB) in parallel
         wait_tma_all_four(mbar_tma_a, tma_phase_a, mbar_tma_b, tma_phase_b,
                           mbar_tma_sfa, tma_phase_sfa, mbar_tma_sfb, tma_phase_sfb);
         __syncthreads();
 
-        // Inner loop: 4 MMAs per TMA load
         #pragma unroll
         for (int k_block = 0; k_block < K_BLOCKS; k_block++) {
-            // Each k_block's data is in a separate smem region
+
             uint8_t* a_smem_k = a_smem + k_block * a_chunk_bytes;
             uint8_t* b_smem_k = b_smem + k_block * b_chunk_bytes;
 
-            // Both A and B use 32B swizzle (mode 6)
-            // stride_dim = 256 (8 rows * 32 bytes for 32B swizzle pattern)
             uint64_t a_desc = make_smem_desc(a_smem_k, 16, 256, 6);
             uint64_t b_desc = make_smem_desc(b_smem_k, 16, 256, 6);
 
-            // Copy scales from smem to tmem for this k_block
+
             copy_scales_smem_to_tmem(sfa_smem_addr, sfb_smem_addr, tmem_sfa, tmem_sfb, k_block);
 
-            // Issue MMA (accumulate after first MMA of first tile)
             bool accumulate = (k_tile > 0) || (k_block > 0);
             issue_mma(tmem_d, a_desc, b_desc, idesc, tmem_sfa, tmem_sfb, mbar_mma, accumulate);
             wait_mma(mbar_mma, mma_phase);
@@ -515,9 +500,7 @@ void create_tensormap(CUtensorMap* tensormap, const void* data_ptr,
 void create_scale_tensormap(CUtensorMap* tensormap, const void* data_ptr,
                             int rows, int k_scales, int row_stride_bytes, int box_rows)
 {
-    // Scales: rows × k_scales layout, 1 byte per scale
-    // Box: 16 bytes (16 scales = 4 k-tiles worth) × box_rows
-    // TMA requires minimum 16 byte box dimension
+
     uint64_t globalDim[2] = {(uint64_t)k_scales, (uint64_t)rows};
     uint64_t globalStride[1] = {(uint64_t)row_stride_bytes};
     uint32_t boxDim[2] = {16, (uint32_t)box_rows};  // 16 bytes minimum for TMA
@@ -561,11 +544,9 @@ torch::Tensor cuda_nvfp4_gemm_tcgen05(
     params.M = M; params.N = N; params.K = K;
     params.c_ptr = reinterpret_cast<__half*>(C.data_ptr());
 
-    // Create tensormaps for A and B with 32B swizzle
     create_tensormap(&params.tensormap_a, A.data_ptr(), M, K_bytes, A.stride(0), MMA_M);
     create_tensormap(&params.tensormap_b, B.data_ptr(), N, K_bytes, B.stride(0), MMA_N);
 
-    // Create tensormaps for scales (no swizzle)
     create_scale_tensormap(&params.tensormap_sfa, SFA.data_ptr(), M, K_scales, SFA.stride(0), MMA_M);
     create_scale_tensormap(&params.tensormap_sfb, SFB.data_ptr(), N, K_scales, SFB.stride(0), MMA_N);
 
