@@ -39,10 +39,10 @@ static constexpr int TMEM_COLS = 128;
 // Now loading 256 K elements = 128 bytes per row
 #define SMEM_A_TILE      (MMA_M * MMA_K_TILE / 2)   // 128 rows * 128 bytes = 16384
 #define SMEM_B_TILE      (MMA_N * MMA_K_TILE / 2)   // 64 rows * 128 bytes = 8192
-// Permuted scale layout: 512 bytes per k-tile for SFA, 256 bytes for SFB
-// For 4 k-tiles: SFA = 2048, SFB = 1024
+// Permuted scale layout: 512 bytes per k-tile for both SFA and SFB
+// For 4 k-tiles: SFA = 2048, SFB = 2048
 #define SMEM_SFA_TILE    (512 * K_BLOCKS)   // 512 bytes per k-tile * 4 = 2048
-#define SMEM_SFB_TILE    (512 * K_BLOCKS)   // 512 bytes per k-tile * 4 = 2048 (wastes half for SFB)
+#define SMEM_SFB_TILE    (512 * K_BLOCKS)   // 512 bytes per k-tile * 4 = 2048
 #define SMEM_OFF_MBAR_MMA     8
 #define SMEM_OFF_MBAR_TMA_A   16
 #define SMEM_OFF_MBAR_TMA_B   24
@@ -201,7 +201,7 @@ __device__ __forceinline__ void init_tmem_and_mbars(
     __syncthreads();
     tmem_d = *reinterpret_cast<uint32_t*>(smem);
     tmem_sfa = tmem_d + MMA_N;
-    tmem_sfb = tmem_d + MMA_N + 4;
+    tmem_sfb = tmem_d + MMA_N + 16;  // cuBLAS uses 16-column gap (0x100 vs 0x110)
     if (threadIdx.x == 0) {
         asm volatile("mbarrier.init.shared::cta.b64 [%0], %1;"
             :: "r"(mbar_mma), "r"(1) : "memory");
@@ -265,33 +265,6 @@ __device__ __forceinline__ void tma_load_scales(
             );
         }
     }
-}
-
-__device__ __forceinline__ void copy_scales_smem_to_tmem(
-    uint8_t* sfa_smem, uint8_t* sfb_smem,
-    uint32_t tmem_sfa, uint32_t tmem_sfb,
-    int k_tile_in_group)  // 0-3: which k-tile within the loaded group of 4
-{
-    // .32x128b.warpx4 = 32 rows × 128 bits × 4 warps = 512 bytes
-    uint8_t* sfa_ptr = sfa_smem + k_tile_in_group * 512;
-    uint8_t* sfb_ptr = sfb_smem + k_tile_in_group * 512;
-
-    // Contiguous 512 bytes: 32 rows × 16 bytes
-    // leading_dim=16, stride_dim=16
-    uint64_t sfa_desc = make_smem_desc(sfa_ptr, 16, 16, 0);
-    uint64_t sfb_desc = make_smem_desc(sfb_ptr, 16, 16, 0);
-
-    if (threadIdx.x == 0) {
-        asm volatile(
-            "tcgen05.cp.cta_group::1.32x128b.warpx4 [%0], %1;"
-            :: "r"(tmem_sfa), "l"(sfa_desc) : "memory"
-        );
-        asm volatile(
-            "tcgen05.cp.cta_group::1.32x128b.warpx4 [%0], %1;"
-            :: "r"(tmem_sfb), "l"(sfb_desc) : "memory"
-        );
-    }
-    asm volatile("tcgen05.wait::st.sync.aligned;" ::: "memory");
 }
 
 // ============================================================================
@@ -383,6 +356,47 @@ __device__ __forceinline__ void dealloc_tmem(uint32_t tmem_d)
     __syncthreads();
 }
 
+
+__device__ __forceinline__ void copy_scales_smem_to_tmem(
+    uint8_t* sfa_smem, uint8_t* sfb_smem,
+    uint32_t tmem_sfa, uint32_t tmem_sfb)
+{
+    // Match cuBLAS: 4 slices per 256-K tile, 128B each, smem offsets 0/128/256/384.
+    if (threadIdx.x == 0) {
+        #pragma unroll
+        for (int blk = 0; blk < 4; blk++) {
+            uint8_t* sfa_base = sfa_smem + blk * 512;
+            uint8_t* sfb_base = sfb_smem + blk * 512;
+
+            #pragma unroll
+            for (int i = 0; i < 4; i++) {
+                uint8_t* sfa_ptr = sfa_base + i * 128;
+                uint8_t* sfb_ptr = sfb_base + i * 128;
+
+                // 128B chunk laid out 4 rows × 32B → leading=32, stride=32, no swizzle
+                uint64_t sfa_desc = make_smem_desc(sfa_ptr, 32, 32, 0);
+                uint64_t sfb_desc = make_smem_desc(sfb_ptr, 32, 32, 0);
+
+                // tmem: 4 columns per chunk, 16 columns per blk
+                uint32_t tmem_sfa_i = tmem_sfa + blk * 16 + i * 4;
+                uint32_t tmem_sfb_i = tmem_sfb + blk * 16 + i * 4;
+
+                asm volatile(
+                    "tcgen05.cp.cta_group::1.32x128b.warpx4 [%0], %1;"
+                    :: "r"(tmem_sfa_i), "l"(sfa_desc) : "memory"
+                );
+                asm volatile(
+                    "tcgen05.cp.cta_group::1.32x128b.warpx4 [%0], %1;"
+                    :: "r"(tmem_sfb_i), "l"(sfb_desc) : "memory"
+                );
+            }
+        }
+    }
+    asm volatile("tcgen05.wait::st.sync.aligned;" ::: "memory");
+}
+
+
+
 // ============================================================================
 // MAIN KERNEL
 // ============================================================================
@@ -441,7 +455,8 @@ gemm_kernel_tcgen05(const __grid_constant__ Gemm_params params)
         wait_tma_all_four(mbar_tma_a, tma_phase_a, mbar_tma_b, tma_phase_b,
                           mbar_tma_sfa, tma_phase_sfa, mbar_tma_sfb, tma_phase_sfb);
         __syncthreads();
-
+        // Load all 4 k-block scale slices into tmem once per 256-K tile
+        copy_scales_smem_to_tmem(sfa_smem, sfb_smem, tmem_sfa, tmem_sfb);
         #pragma unroll
         for (int k_block = 0; k_block < K_BLOCKS; k_block++) {
 
@@ -451,11 +466,9 @@ gemm_kernel_tcgen05(const __grid_constant__ Gemm_params params)
             uint64_t a_desc = make_smem_desc(a_smem_k, 16, 256, 6);
             uint64_t b_desc = make_smem_desc(b_smem_k, 16, 256, 6);
 
-
-            copy_scales_smem_to_tmem(sfa_smem, sfb_smem, tmem_sfa, tmem_sfb, k_block);
-
             bool accumulate = (k_tile > 0) || (k_block > 0);
-            issue_mma(tmem_d, a_desc, b_desc, idesc, tmem_sfa, tmem_sfb, mbar_mma, accumulate);
+            issue_mma(tmem_d, a_desc, b_desc, idesc,
+                tmem_sfa + 16 * k_block, tmem_sfb + 16 * k_block, mbar_mma, accumulate);
             wait_mma(mbar_mma, mma_phase);
         }
     }
@@ -491,11 +504,6 @@ void create_tensormap(CUtensorMap* tensormap, const void* data_ptr,
         CU_TENSOR_MAP_FLOAT_OOB_FILL_NONE
     );
 
-    if (result != CUDA_SUCCESS) {
-        const char* errStr;
-        cuGetErrorString(result, &errStr);
-        throw std::runtime_error(std::string("cuTensorMapEncodeTiled failed: ") + errStr);
-    }
 }
 
 // ============================================================================
@@ -527,12 +535,6 @@ void create_scale_tensormap_perm(CUtensorMap* tensormap, const void* data_ptr,
         CU_TENSOR_MAP_L2_PROMOTION_NONE,
         CU_TENSOR_MAP_FLOAT_OOB_FILL_NONE
     );
-
-    if (result != CUDA_SUCCESS) {
-        const char* errStr;
-        cuGetErrorString(result, &errStr);
-        throw std::runtime_error(std::string("cuTensorMapEncodeTiled (perm scales) failed: ") + errStr);
-    }
 }
 
 torch::Tensor cuda_nvfp4_gemm_tcgen05(
