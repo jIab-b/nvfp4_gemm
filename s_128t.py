@@ -219,9 +219,7 @@ __device__ __forceinline__ void init_tmem_and_mbars(
 // TMA SCALE LOADING: 4D layout using cp.async.bulk.tensor.4d
 // 4D shape: [16 bytes per row][32 rows][total_k_blocks][num_m_blocks]
 // Strides: [16, 512, m_block_stride] — all >= 16 for TMA alignment ✓
-// Box: [16, 8, 1, 1] = 128 bytes per load (16 bytes × 8 rows)
-// Load each k_block in 4 pieces (rows 0-7, 8-15, 16-23, 24-31), 16 loads per k_tile
-// This preserves the [32 rows × 16 bytes] layout required by tcgen05.cp
+// Box: [16, 32, 4, 1] = 2048 bytes per load (entire tile in one TMA)
 // ============================================================================
 __device__ __forceinline__ void tma_load_scales(
     const CUtensorMap* tensormap_sfa, const CUtensorMap* tensormap_sfb,
@@ -229,59 +227,38 @@ __device__ __forceinline__ void tma_load_scales(
     uint32_t sfa_smem_addr, uint32_t sfb_smem_addr,
     uint32_t mbar_sfa, uint32_t mbar_sfb)
 {
-    // Total bytes for 4 k_blocks = 2048 bytes (16 loads of 128 bytes each)
+    // Total bytes for 4 k_blocks = 2048 bytes (1 load per scale tensor)
     const int total_bytes = 4 * 512;
+    const int k_block_base = k_tile * 4;  // Starting k_block index for this tile
 
     if (threadIdx.x == 0) {
+        // SFA: one TMA load for entire tile
         asm volatile(
             "mbarrier.arrive.expect_tx.shared::cta.b64 _, [%0], %1;"
             :: "r"(mbar_sfa), "r"(total_bytes) : "memory"
         );
+        asm volatile(
+            "cp.async.bulk.tensor.4d.shared::cluster.global.mbarrier::complete_tx::bytes"
+            " [%0], [%1, {%2, %3, %4, %5}], [%6];"
+            :: "r"(sfa_smem_addr), "l"(tensormap_sfa),
+               "r"(0), "r"(0), "r"(k_block_base), "r"(m_idx),
+               "r"(mbar_sfa)
+            : "memory"
+        );
 
-        // Load 4 k_blocks, 4 TMA loads each (8 rows × 16 bytes = 128 bytes per load)
-        #pragma unroll
-        for (int b = 0; b < 4; b++) {
-            int k_block_idx = k_tile * 4 + b;
-            #pragma unroll
-            for (int r = 0; r < 4; r++) {
-                // Each load: 16 bytes × 8 rows = 128 bytes
-                // SMEM offset: k_block * 512 + row_chunk * 128
-                // This gives contiguous [32 rows × 16 bytes] layout per k_block
-                uint32_t smem_addr = sfa_smem_addr + b * 512 + r * 128;
-                int row_coord = r * 8;  // Starting row (0, 8, 16, 24)
-                asm volatile(
-                    "cp.async.bulk.tensor.4d.shared::cluster.global.mbarrier::complete_tx::bytes"
-                    " [%0], [%1, {%2, %3, %4, %5}], [%6];"
-                    :: "r"(smem_addr), "l"(tensormap_sfa),
-                       "r"(0), "r"(row_coord), "r"(k_block_idx), "r"(m_idx),
-                       "r"(mbar_sfa)
-                    : "memory"
-                );
-            }
-        }
-
+        // SFB: one TMA load for entire tile
         asm volatile(
             "mbarrier.arrive.expect_tx.shared::cta.b64 _, [%0], %1;"
             :: "r"(mbar_sfb), "r"(total_bytes) : "memory"
         );
-
-        #pragma unroll
-        for (int b = 0; b < 4; b++) {
-            int k_block_idx = k_tile * 4 + b;
-            #pragma unroll
-            for (int r = 0; r < 4; r++) {
-                uint32_t smem_addr = sfb_smem_addr + b * 512 + r * 128;
-                int row_coord = r * 8;
-                asm volatile(
-                    "cp.async.bulk.tensor.4d.shared::cluster.global.mbarrier::complete_tx::bytes"
-                    " [%0], [%1, {%2, %3, %4, %5}], [%6];"
-                    :: "r"(smem_addr), "l"(tensormap_sfb),
-                       "r"(0), "r"(row_coord), "r"(k_block_idx), "r"(n_idx),
-                       "r"(mbar_sfb)
-                    : "memory"
-                );
-            }
-        }
+        asm volatile(
+            "cp.async.bulk.tensor.4d.shared::cluster.global.mbarrier::complete_tx::bytes"
+            " [%0], [%1, {%2, %3, %4, %5}], [%6];"
+            :: "r"(sfb_smem_addr), "l"(tensormap_sfb),
+               "r"(0), "r"(0), "r"(k_block_base), "r"(n_idx),
+               "r"(mbar_sfb)
+            : "memory"
+        );
     }
 }
 
@@ -526,8 +503,7 @@ void create_tensormap(CUtensorMap* tensormap, const void* data_ptr,
 // HOST: Create 4D TensorMap for permuted scales
 // 4D shape: [16 bytes per row][32 rows][total_k_blocks][num_m_blocks]
 // Strides: [16, 512, m_block_stride] — all >= 16 for TMA alignment ✓
-// Box: [16, 8, 1, 1] = 128 bytes per load (16 bytes × 8 rows)
-// Load 4 times per k_block (rows 0-7, 8-15, 16-23, 24-31)
+// Box: [16, 32, 4, 1] = 2048 bytes per load (entire tile in one TMA)
 // ============================================================================
 void create_scale_tensormap_4d(CUtensorMap* tensormap, const void* data_ptr,
                                int num_m_blocks, int total_k_blocks, int m_block_stride)
@@ -537,8 +513,8 @@ void create_scale_tensormap_4d(CUtensorMap* tensormap, const void* data_ptr,
     // Strides for dims 1-3 (dim 0 has implicit stride of 1)
     // All strides >= 16 to satisfy TMA alignment requirements
     uint64_t globalStride[3] = {16, 512, (uint64_t)m_block_stride};
-    // Box loads 128 bytes: 16 bytes × 8 rows (preserves row layout for tcgen05.cp)
-    uint32_t boxDim[4] = {16, 8, 1, 1};
+    // Box loads 2048 bytes: 16 bytes × 32 rows × 4 k_blocks (entire tile)
+    uint32_t boxDim[4] = {16, 32, 4, 1};
     uint32_t elementStride[4] = {1, 1, 1, 1};
 
     CUresult result = cuTensorMapEncodeTiled(
