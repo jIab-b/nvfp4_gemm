@@ -39,10 +39,10 @@ static constexpr int TMEM_COLS = 128;
 // Now loading 256 K elements = 128 bytes per row
 #define SMEM_A_TILE      (MMA_M * MMA_K_TILE / 2)   // 128 rows * 128 bytes = 16384
 #define SMEM_B_TILE      (MMA_N * MMA_K_TILE / 2)   // 64 rows * 128 bytes = 8192
-// Permuted scale layout: 512 bytes per k-tile for both SFA and SFB
-// For 4 k-tiles: SFA = 2048, SFB = 2048
+// Permuted scale layout: 512 bytes per k-tile for SFA (M=128), 256 bytes for SFB (N=64)
+// We allocate 2048 for both (oversized for SFB) to keep TMA simple
 #define SMEM_SFA_TILE    (512 * K_BLOCKS)   // 512 bytes per k-tile * 4 = 2048
-#define SMEM_SFB_TILE    (512 * K_BLOCKS)   // 512 bytes per k-tile * 4 = 2048
+#define SMEM_SFB_TILE    (512 * K_BLOCKS)   // 512 bytes per k-tile * 4 = 2048 (only 1024 used for N=64)
 #define SMEM_OFF_MBAR_MMA     8
 #define SMEM_OFF_MBAR_TMA_A   16
 #define SMEM_OFF_MBAR_TMA_B   24
@@ -361,35 +361,37 @@ __device__ __forceinline__ void copy_scales_smem_to_tmem(
     uint8_t* sfa_smem, uint8_t* sfb_smem,
     uint32_t tmem_sfa, uint32_t tmem_sfb)
 {
-    // Match cuBLAS: 4 slices per 256-K tile, 128B each, smem offsets 0/128/256/384.
+    // Each k-block has 512 bytes of scale data in SMEM (loaded via TMA as 4x128B chunks)
+    // SFA (M=128): 128 rows / 32 = 4 scale groups per k-block = 512 bytes
+    // SFB (N=64):  64 rows / 32 = 2 scale groups per k-block = 256 bytes (but we copy 512)
+    //
+    // SMEM layout: contiguous 512-byte blocks per k-tile
+    // TMEM layout: scales at tmem_sfa + k_block * 16, tmem_sfb + k_block * 16
+    //
+    // Descriptor: lead_dim=128 (row size), stride=128 (rows are contiguous)
+
     if (threadIdx.x == 0) {
         #pragma unroll
         for (int blk = 0; blk < 4; blk++) {
+            // Each k-block's scale data is at offset blk * 512 in SMEM
             uint8_t* sfa_base = sfa_smem + blk * 512;
             uint8_t* sfb_base = sfb_smem + blk * 512;
 
-            #pragma unroll
-            for (int i = 0; i < 4; i++) {
-                uint8_t* sfa_ptr = sfa_base + i * 128;
-                uint8_t* sfb_ptr = sfb_base + i * 128;
+            // Stride = 128 to match TMA's contiguous 128-byte rows
+            uint64_t sfa_desc = make_smem_desc(sfa_base, 128, 128, 0);
+            uint64_t sfb_desc = make_smem_desc(sfb_base, 128, 128, 0);
 
-                // 128B chunk laid out 4 rows × 32B → leading=32, stride=32, no swizzle
-                uint64_t sfa_desc = make_smem_desc(sfa_ptr, 32, 32, 0);
-                uint64_t sfb_desc = make_smem_desc(sfb_ptr, 32, 32, 0);
+            // 1 copy per k-block for SFA (covers all 128 M rows)
+            asm volatile(
+                "tcgen05.cp.cta_group::1.32x128b.warpx4 [%0], %1;"
+                :: "r"(tmem_sfa + blk * 16), "l"(sfa_desc) : "memory"
+            );
 
-                // tmem: 4 columns per chunk, 16 columns per blk
-                uint32_t tmem_sfa_i = tmem_sfa + blk * 16 + i * 4;
-                uint32_t tmem_sfb_i = tmem_sfb + blk * 16 + i * 4;
-
-                asm volatile(
-                    "tcgen05.cp.cta_group::1.32x128b.warpx4 [%0], %1;"
-                    :: "r"(tmem_sfa_i), "l"(sfa_desc) : "memory"
-                );
-                asm volatile(
-                    "tcgen05.cp.cta_group::1.32x128b.warpx4 [%0], %1;"
-                    :: "r"(tmem_sfb_i), "l"(sfb_desc) : "memory"
-                );
-            }
+            // 1 copy per k-block for SFB (covers 64 N rows, extra data ignored)
+            asm volatile(
+                "tcgen05.cp.cta_group::1.32x128b.warpx4 [%0], %1;"
+                :: "r"(tmem_sfb + blk * 16), "l"(sfb_desc) : "memory"
+            );
         }
     }
     asm volatile("tcgen05.wait::st.sync.aligned;" ::: "memory");
