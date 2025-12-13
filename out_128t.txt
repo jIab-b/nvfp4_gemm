@@ -1,5 +1,5 @@
 "**NVIDIA on GitHub ✅ success**
-> Workflow [20185991239](<https://github.com/gpu-mode/discord-cluster-manager/actions/runs/20185991239>) completed
+> Workflow [20187530206](<https://github.com/gpu-mode/discord-cluster-manager/actions/runs/20187530206>) completed
 > Downloading artifacts... done
 > ❌ Running benchmarks failed (internal error 1)
 
@@ -11,8 +11,8 @@ Running on:
 * Torch: `2.9.1+cu130`
 # Running failed
 Command ```bash
-python3 eval.py benchmark /tmp/tmphtdn9_w5```
-exited with error code **1** after 4.90 seconds.
+python3 eval.py benchmark /tmp/tmp5ses679l```
+exited with error code **1** after 3.74 seconds.
 
 ## Program stderr:
 ```
@@ -21,15 +21,11 @@ multiprocessing.pool.RemoteTraceback:
 Traceback (most recent call last):
   File \"/usr/lib/python3.10/multiprocessing/pool.py\", line 125, in worker
     result = (True, func(*args, **kwds))
-  File \"/home/runner/_work/discord-cluster-manager/discord-cluster-manager/eval.py\", line 233, in _run_single_benchmark
-    good, message = check_implementation(reference_output, custom_output)
-  File \"/home/runner/_work/discord-cluster-manager/discord-cluster-manager/utils.py\", line 156, in wrapped
-    return match_reference(data, output, reference=reference, **kwargs)
-  File \"/home/runner/_work/discord-cluster-manager/discord-cluster-manager/utils.py\", line 141, in match_reference
-    expected = reference(data)
-  File \"/home/runner/_work/discord-cluster-manager/discord-cluster-manager/reference.py\", line 44, in ref_kernel
-    res = torch._scaled_mm(
-RuntimeError: CUDA error: CUBLAS_STATUS_INTERNAL_ERROR when calling `cublasCreate(handle)`
+  File \"/home/runner/_work/discord-cluster-manager/discord-cluster-manager/eval.py\", line 228, in _run_single_benchmark
+    output = custom_kernel(_clone_data(data))
+  File \"/home/runner/_work/discord-cluster-manager/discord-cluster-manager/submission.py\", line 615, in custom_kernel
+    return nvfp4_tcgen05_module.cuda_nvfp4_gemm_tcgen05(
+RuntimeError: Scale tensormap failed: invalid argument
 \"\"\"
 
 The above exception was the direct cause of the following exception:
@@ -47,4 +43,4 @@ Traceback (most recent call last):
     return self.apply_async(func, args, kwds).get()
   File \"/usr/lib/python3.10/multiprocessing/pool.py\", line 774, in get
     raise self._value
-RuntimeError: CUDA error: CUBLAS_STATUS_INTERNAL_ERROR when calling `cublasCreate(handle)````"
+RuntimeError: Scale tensormap failed: invalid argument```"
