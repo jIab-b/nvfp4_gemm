@@ -285,39 +285,21 @@ __device__ __forceinline__ void tma_load_scales(
 }
 
 // ============================================================================
-// SMEM -> TMEM scale copy using tcgen05.cp (cuBLAS-style precomputed descriptors)
-// Permuted layout: each k_block is 512 bytes in interleaved format [32 rows × 16 bytes]
-// tcgen05.cp.32x128b.warpx4 copies 512 bytes (32 rows × 16 bytes, warpx4 distributes to 128 M rows)
-// SMEM layout: [32, 16] per k_block, use lead=16, stride=16 for contiguous interleaved data
+// SMEM -> TMEM scale copy for ONE k_block using tcgen05.cp
+// 512 bytes: [32 rows × 16 bytes], lead=16, stride=16
 // ============================================================================
-__device__ __forceinline__ void copy_scales_smem_to_tmem(
+__device__ __forceinline__ void copy_scale_block_to_tmem(
     uint8_t* sfa_smem, uint8_t* sfb_smem,
     uint32_t tmem_sfa, uint32_t tmem_sfb)
 {
+    // warpx4 variant requires participation from 4 warps; let the whole CTA issue it.
     if (threadIdx.x == 0) {
-        // Precompute all 8 descriptors
-        // Permuted layout: 512 bytes per k_block as [32 rows × 16 bytes]
-        // lead=16, stride=16 for contiguous interleaved block
-        uint64_t sfa_desc0 = make_smem_desc(sfa_smem + 0 * 512, 16, 16, 0);
-        uint64_t sfa_desc1 = make_smem_desc(sfa_smem + 1 * 512, 16, 16, 0);
-        uint64_t sfa_desc2 = make_smem_desc(sfa_smem + 2 * 512, 16, 16, 0);
-        uint64_t sfa_desc3 = make_smem_desc(sfa_smem + 3 * 512, 16, 16, 0);
-        uint64_t sfb_desc0 = make_smem_desc(sfb_smem + 0 * 512, 16, 16, 0);
-        uint64_t sfb_desc1 = make_smem_desc(sfb_smem + 1 * 512, 16, 16, 0);
-        uint64_t sfb_desc2 = make_smem_desc(sfb_smem + 2 * 512, 16, 16, 0);
-        uint64_t sfb_desc3 = make_smem_desc(sfb_smem + 3 * 512, 16, 16, 0);
-
-        // Issue all 8 copies (4 SFA + 4 SFB) with +4 TMEM spacing (unchanged)
-        asm volatile("tcgen05.cp.cta_group::1.32x128b.warpx4 [%0], %1;" :: "r"(tmem_sfa + 0), "l"(sfa_desc0) : "memory");
-        asm volatile("tcgen05.cp.cta_group::1.32x128b.warpx4 [%0], %1;" :: "r"(tmem_sfa + 4), "l"(sfa_desc1) : "memory");
-        asm volatile("tcgen05.cp.cta_group::1.32x128b.warpx4 [%0], %1;" :: "r"(tmem_sfa + 8), "l"(sfa_desc2) : "memory");
-        asm volatile("tcgen05.cp.cta_group::1.32x128b.warpx4 [%0], %1;" :: "r"(tmem_sfa + 12), "l"(sfa_desc3) : "memory");
-        asm volatile("tcgen05.cp.cta_group::1.32x128b.warpx4 [%0], %1;" :: "r"(tmem_sfb + 0), "l"(sfb_desc0) : "memory");
-        asm volatile("tcgen05.cp.cta_group::1.32x128b.warpx4 [%0], %1;" :: "r"(tmem_sfb + 4), "l"(sfb_desc1) : "memory");
-        asm volatile("tcgen05.cp.cta_group::1.32x128b.warpx4 [%0], %1;" :: "r"(tmem_sfb + 8), "l"(sfb_desc2) : "memory");
-        asm volatile("tcgen05.cp.cta_group::1.32x128b.warpx4 [%0], %1;" :: "r"(tmem_sfb + 12), "l"(sfb_desc3) : "memory");
+        uint64_t sfa_desc = make_smem_desc(sfa_smem, 16, 16, 0);
+        uint64_t sfb_desc = make_smem_desc(sfb_smem, 16, 16, 0);
+        asm volatile("tcgen05.cp.cta_group::1.32x128b.warpx4 [%0], %1;" :: "r"(tmem_sfa), "l"(sfa_desc) : "memory");
+        asm volatile("tcgen05.cp.cta_group::1.32x128b.warpx4 [%0], %1;" :: "r"(tmem_sfb), "l"(sfb_desc) : "memory");
+        asm volatile("tcgen05.wait::st.sync.aligned;" ::: "memory");
     }
-    asm volatile("tcgen05.wait::st.sync.aligned;" ::: "memory");
 }
 
 // ============================================================================
@@ -474,12 +456,14 @@ gemm_kernel_tcgen05(const __grid_constant__ Gemm_params params)
                           mbar_tma_sfa, tma_phase_sfa, mbar_tma_sfb, tma_phase_sfb);
         __syncthreads();
 
-        // Copy all 4 k-blocks of scales to TMEM once per 256-K tile
-        copy_scales_smem_to_tmem(sfa_smem, sfb_smem, tmem_sfa, tmem_sfb);
-
         // Inner loop: 4 MMAs per TMA load
         #pragma unroll
         for (int k_block = 0; k_block < K_BLOCKS; k_block++) {
+            // Copy this k_block's scales to TMEM
+            copy_scale_block_to_tmem(
+                sfa_smem + k_block * 512, sfb_smem + k_block * 512,
+                tmem_sfa + 4 * k_block, tmem_sfb + 4 * k_block);
+
             // Each k_block's data is in a separate smem region
             uint8_t* a_smem_k = a_smem + k_block * a_chunk_bytes;
             uint8_t* b_smem_k = b_smem + k_block * b_chunk_bytes;
@@ -644,3 +628,4 @@ def custom_kernel(data: input_t) -> output_t:
     return nvfp4_tcgen05_module.cuda_nvfp4_gemm_tcgen05(
         a, b, sfa, sfb, sfa_perm[:,:,:,:,:,0], sfb_perm[:,:,:,:,:,0], c
     )
+
