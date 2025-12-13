@@ -33,7 +33,7 @@ static constexpr int MMA_K_TILE = 256; // 256 FP4 loaded per TMA (4 MMAs worth)
 static constexpr int K_BLOCKS = 4;     // Number of MMAs per TMA load
 static constexpr int WARPS_PER_CTA = 4;
 static constexpr int THREADS_PER_WARP = 32;
-static constexpr int TMEM_COLS = 160;  // 128 (acc) + 16 (SFA) + 16 (SFB)
+static constexpr int TMEM_COLS = 256;  // 128 (acc) + 16 (SFA) + 16 (SFB)
 
 // 32B swizzle: 8 rows x 32 bytes = 256 byte atom
 // Now loading 256 K elements = 128 bytes per row
@@ -415,7 +415,6 @@ gemm_kernel_tcgen05(const __grid_constant__ Gemm_params params)
     uint32_t tmem_d, tmem_sfa, tmem_sfb;
     init_tmem_and_mbars(smem, smem_base, mbar_mma, mbar_tma_a, mbar_tma_b,
                         mbar_tma_sfa, mbar_tma_sfb, tmem_d, tmem_sfa, tmem_sfb);
-
     uint32_t idesc = make_mxf4_idesc(MMA_M, MMA_N);
     const int num_k_tiles = params.K / MMA_K_TILE;  // Outer loop over 256-K tiles
     int mma_phase = 0;
@@ -628,4 +627,3 @@ def custom_kernel(data: input_t) -> output_t:
     return nvfp4_tcgen05_module.cuda_nvfp4_gemm_tcgen05(
         a, b, sfa, sfb, sfa_perm[:,:,:,:,:,0], sfb_perm[:,:,:,:,:,0], c
     )
-
