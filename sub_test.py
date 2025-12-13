@@ -366,7 +366,7 @@ __device__ __forceinline__ void copy_scales_smem_to_tmem(
     // SFB (N=64):  64 rows / 32 = 2 scale groups per k-block = 256 bytes (but we copy 512)
     //
     // SMEM layout: contiguous 512-byte blocks per k-tile
-    // TMEM layout: scales at tmem_sfa + k_block * 16, tmem_sfb + k_block * 16
+    // TMEM layout: scales at tmem_sfa + k_block * 4, tmem_sfb + k_block * 4
     //
     // Descriptor: lead_dim=128 (row size), stride=128 (rows are contiguous)
 
@@ -381,16 +381,16 @@ __device__ __forceinline__ void copy_scales_smem_to_tmem(
             uint64_t sfa_desc = make_smem_desc(sfa_base, 128, 128, 0);
             uint64_t sfb_desc = make_smem_desc(sfb_base, 128, 128, 0);
 
-            // 1 copy per k-block for SFA (covers all 128 M rows)
+            // 1 copy per k-block for SFA - spacing is 4 columns (not 16!)
             asm volatile(
                 "tcgen05.cp.cta_group::1.32x128b.warpx4 [%0], %1;"
-                :: "r"(tmem_sfa + blk * 16), "l"(sfa_desc) : "memory"
+                :: "r"(tmem_sfa + blk * 4), "l"(sfa_desc) : "memory"
             );
 
-            // 1 copy per k-block for SFB (covers 64 N rows, extra data ignored)
+            // 1 copy per k-block for SFB - spacing is 4 columns
             asm volatile(
                 "tcgen05.cp.cta_group::1.32x128b.warpx4 [%0], %1;"
-                :: "r"(tmem_sfb + blk * 16), "l"(sfb_desc) : "memory"
+                :: "r"(tmem_sfb + blk * 4), "l"(sfb_desc) : "memory"
             );
         }
     }
@@ -470,7 +470,7 @@ gemm_kernel_tcgen05(const __grid_constant__ Gemm_params params)
 
             bool accumulate = (k_tile > 0) || (k_block > 0);
             issue_mma(tmem_d, a_desc, b_desc, idesc,
-                tmem_sfa + 16 * k_block, tmem_sfb + 16 * k_block, mbar_mma, accumulate);
+                tmem_sfa + 4 * k_block, tmem_sfb + 4 * k_block, mbar_mma, accumulate);
             wait_mma(mbar_mma, mma_phase);
         }
     }

@@ -33,15 +33,15 @@ static constexpr int MMA_K_TILE = 256; // 256 FP4 loaded per TMA (4 MMAs worth)
 static constexpr int K_BLOCKS = 4;     // Number of MMAs per TMA load
 static constexpr int WARPS_PER_CTA = 4;
 static constexpr int THREADS_PER_WARP = 32;
-static constexpr int TMEM_COLS = 136;  // Increased: 128 (acc) + 4 (SFA) + 4 (SFB) + padding
+static constexpr int TMEM_COLS = 160;  // 128 (acc) + 16 (SFA) + 16 (SFB)
 
 // 32B swizzle: 8 rows x 32 bytes = 256 byte atom
 // Now loading 256 K elements = 128 bytes per row
 #define SMEM_A_TILE      (MMA_M * MMA_K_TILE / 2)   // 128 rows * 128 bytes = 16384
 #define SMEM_B_TILE      (MMA_N * MMA_K_TILE / 2)   // 128 rows * 128 bytes = 16384
-#define SMEM_SFA_TILE    (MMA_M * 16)   // 128 rows * 16 bytes = 2048 (covers 4 k-tiles)
-#define SMEM_SFB_TILE    (MMA_N * 16)   // 128 rows * 16 bytes = 2048 (covers 4 k-tiles)
-#define SCALE_K_TILES    4              // Load scales for 4 k-tiles at once (16 bytes)
+// Permuted scale layout: 512 bytes per k-tile for both SFA and SFB (M=N=128)
+#define SMEM_SFA_TILE    (512 * K_BLOCKS)   // 512 bytes per k-tile * 4 = 2048
+#define SMEM_SFB_TILE    (512 * K_BLOCKS)   // 512 bytes per k-tile * 4 = 2048
 #define SMEM_OFF_MBAR_MMA     8
 #define SMEM_OFF_MBAR_TMA_A   16
 #define SMEM_OFF_MBAR_TMA_B   24
@@ -202,8 +202,8 @@ __device__ __forceinline__ void init_tmem_and_mbars(
     }
     __syncthreads();
     tmem_d = *reinterpret_cast<uint32_t*>(smem);
-    tmem_sfa = tmem_d + MMA_N;      // offset 128 for N=128
-    tmem_sfb = tmem_d + MMA_N + 4;  // offset 132
+    tmem_sfa = tmem_d + MMA_N;       // offset 128 for N=128
+    tmem_sfb = tmem_d + MMA_N + 16;  // offset 144 (16-column gap like cuBLAS)
     if (threadIdx.x == 0) {
         asm volatile("mbarrier.init.shared::cta.b64 [%0], %1;"
             :: "r"(mbar_mma), "r"(1) : "memory");
@@ -220,96 +220,96 @@ __device__ __forceinline__ void init_tmem_and_mbars(
 }
 
 // ============================================================================
-// TMA SCALE LOADING: global -> smem (TMA bulk) -> tmem (tcgen05.st)
-// Loads 16 bytes (4 k-tiles worth) of scales at once
+// TMA SCALE LOADING: global -> smem (TMA bulk)
+// Loads 2048 bytes (16 x 128B chunks) for 4 k-tiles worth of scales
 // ============================================================================
 __device__ __forceinline__ void tma_load_scales(
     const CUtensorMap* tensormap_sfa, const CUtensorMap* tensormap_sfb,
-    int m_block, int n_block, int scale_k_group,
+    int m_block, int n_block, int k_tile,
     uint32_t sfa_smem_addr, uint32_t sfb_smem_addr,
     uint32_t mbar_sfa, uint32_t mbar_sfb)
 {
-    // scale_k_group is which group of 4 k-tiles (each group = 16 bytes of scales)
-    // k_byte_offset = scale_k_group * 16
-    const int sf_k_bytes = scale_k_group * 16;
+    // Permuted layout: 512 bytes per k-tile, 128 bytes per TMA load
+    // Need 4 loads per k-tile, 16 loads total for 4 k-tiles = 2048 bytes
+    const int base_k_byte = k_tile * 4 * 512;  // Starting byte offset for this group of 4 k-tiles
+    const int m_idx = m_block / MMA_M;
+    const int n_idx = n_block / MMA_N;
 
     if (threadIdx.x == 0) {
-        // SFA: 128 rows * 16 bytes = 2048 bytes
         asm volatile(
             "mbarrier.arrive.expect_tx.shared::cta.b64 _, [%0], %1;"
             :: "r"(mbar_sfa), "r"(SMEM_SFA_TILE) : "memory"
         );
-        asm volatile(
-            "cp.async.bulk.tensor.2d.shared::cluster.global.mbarrier::complete_tx::bytes"
-            " [%0], [%1, {%2, %3}], [%4];"
-            :: "r"(sfa_smem_addr), "l"(tensormap_sfa), "r"(sf_k_bytes), "r"(m_block), "r"(mbar_sfa)
-            : "memory"
-        );
 
-        // SFB: 128 rows * 16 bytes = 2048 bytes (was 64 rows = 1024 bytes)
+        #pragma unroll
+        for (int i = 0; i < 16; i++) {  // 16 loads of 128 bytes = 2048 bytes
+            int k_byte_offset = base_k_byte + i * 128;
+            uint32_t smem_addr = sfa_smem_addr + i * 128;
+            asm volatile(
+                "cp.async.bulk.tensor.2d.shared::cluster.global.mbarrier::complete_tx::bytes"
+                " [%0], [%1, {%2, %3}], [%4];"
+                :: "r"(smem_addr), "l"(tensormap_sfa), "r"(k_byte_offset), "r"(m_idx), "r"(mbar_sfa)
+                : "memory"
+            );
+        }
+
         asm volatile(
             "mbarrier.arrive.expect_tx.shared::cta.b64 _, [%0], %1;"
             :: "r"(mbar_sfb), "r"(SMEM_SFB_TILE) : "memory"
         );
-        asm volatile(
-            "cp.async.bulk.tensor.2d.shared::cluster.global.mbarrier::complete_tx::bytes"
-            " [%0], [%1, {%2, %3}], [%4];"
-            :: "r"(sfb_smem_addr), "l"(tensormap_sfb), "r"(sf_k_bytes), "r"(n_block), "r"(mbar_sfb)
-            : "memory"
-        );
+
+        #pragma unroll
+        for (int i = 0; i < 16; i++) {
+            int k_byte_offset = base_k_byte + i * 128;
+            uint32_t smem_addr = sfb_smem_addr + i * 128;
+            asm volatile(
+                "cp.async.bulk.tensor.2d.shared::cluster.global.mbarrier::complete_tx::bytes"
+                " [%0], [%1, {%2, %3}], [%4];"
+                :: "r"(smem_addr), "l"(tensormap_sfb), "r"(k_byte_offset), "r"(n_idx), "r"(mbar_sfb)
+                : "memory"
+            );
+        }
     }
 }
 
+// ============================================================================
+// SMEM -> TMEM scale copy using tcgen05.cp
+// ============================================================================
 __device__ __forceinline__ void copy_scales_smem_to_tmem(
-    uint32_t sfa_smem_addr, uint32_t sfb_smem_addr,
-    uint32_t tmem_sfa, uint32_t tmem_sfb,
-    int k_tile_in_group)  // 0-3: which k-tile within the loaded group of 4
+    uint8_t* sfa_smem, uint8_t* sfb_smem,
+    uint32_t tmem_sfa, uint32_t tmem_sfb)
 {
-    const int lane_id = threadIdx.x % 32;
-    const int warp_id = threadIdx.x / 32;
+    // Each k-block has 512 bytes of scale data in SMEM (loaded via TMA as 4x128B chunks)
+    // SFA (M=128): 128 rows / 32 = 4 scale groups per k-block = 512 bytes
+    // SFB (N=128): 128 rows / 32 = 4 scale groups per k-block = 512 bytes
+    //
+    // SMEM layout: contiguous 512-byte blocks per k-tile
+    // TMEM layout: scales at tmem_sfa + k_block * 4, tmem_sfb + k_block * 4
 
-    // Each row has 16 bytes (4 k-tiles × 4 bytes each)
-    // Offset by k_tile_in_group * 4 bytes to get the right 4 bytes
-    const int k_byte_offset = k_tile_in_group * 4;
+    if (threadIdx.x == 0) {
+        #pragma unroll
+        for (int blk = 0; blk < 4; blk++) {
+            // Each k-block's scale data is at offset blk * 512 in SMEM
+            uint8_t* sfa_base = sfa_smem + blk * 512;
+            uint8_t* sfb_base = sfb_smem + blk * 512;
 
-    // Load SFA from smem and store to tmem (warp-based indexing)
-    // Row layout: 16 bytes per row, we want bytes [k_byte_offset, k_byte_offset+4)
-    uint32_t sfa_saddr = sfa_smem_addr + (warp_id * 32 + lane_id) * 16 + k_byte_offset;
-    uint32_t sfa_val;
-    asm volatile("ld.shared.u32 %0, [%1];" : "=r"(sfa_val) : "r"(sfa_saddr) : "memory");
+            // Stride = 128 to match TMA's contiguous 128-byte rows
+            uint64_t sfa_desc = make_smem_desc(sfa_base, 128, 128, 0);
+            uint64_t sfb_desc = make_smem_desc(sfb_base, 128, 128, 0);
 
-    asm volatile(
-        "tcgen05.st.sync.aligned.32x32b.x1.b32 [%0], {%1};"
-        :: "r"(tmem_sfa + warp_id), "r"(sfa_val) : "memory"
-    );
+            // 1 copy per k-block for SFA - spacing is 4 columns
+            asm volatile(
+                "tcgen05.cp.cta_group::1.32x128b.warpx4 [%0], %1;"
+                :: "r"(tmem_sfa + blk * 4), "l"(sfa_desc) : "memory"
+            );
 
-    // Load SFB from smem and store to tmem (4 loads to cover 128 rows)
-    uint32_t sfb_saddr0 = sfb_smem_addr + lane_id * 16 + k_byte_offset;
-    uint32_t sfb_saddr1 = sfb_smem_addr + (lane_id + 32) * 16 + k_byte_offset;
-    uint32_t sfb_saddr2 = sfb_smem_addr + (lane_id + 64) * 16 + k_byte_offset;
-    uint32_t sfb_saddr3 = sfb_smem_addr + (lane_id + 96) * 16 + k_byte_offset;
-    uint32_t sfb_val0, sfb_val1, sfb_val2, sfb_val3;
-    asm volatile("ld.shared.u32 %0, [%1];" : "=r"(sfb_val0) : "r"(sfb_saddr0) : "memory");
-    asm volatile("ld.shared.u32 %0, [%1];" : "=r"(sfb_val1) : "r"(sfb_saddr1) : "memory");
-    asm volatile("ld.shared.u32 %0, [%1];" : "=r"(sfb_val2) : "r"(sfb_saddr2) : "memory");
-    asm volatile("ld.shared.u32 %0, [%1];" : "=r"(sfb_val3) : "r"(sfb_saddr3) : "memory");
-
-    asm volatile(
-        "tcgen05.st.sync.aligned.32x32b.x1.b32 [%0], {%1};"
-        :: "r"(tmem_sfb), "r"(sfb_val0) : "memory"
-    );
-    asm volatile(
-        "tcgen05.st.sync.aligned.32x32b.x1.b32 [%0], {%1};"
-        :: "r"(tmem_sfb + 1), "r"(sfb_val1) : "memory"
-    );
-    asm volatile(
-        "tcgen05.st.sync.aligned.32x32b.x1.b32 [%0], {%1};"
-        :: "r"(tmem_sfb + 2), "r"(sfb_val2) : "memory"
-    );
-    asm volatile(
-        "tcgen05.st.sync.aligned.32x32b.x1.b32 [%0], {%1};"
-        :: "r"(tmem_sfb + 3), "r"(sfb_val3) : "memory"
-    );
+            // 1 copy per k-block for SFB - spacing is 4 columns
+            asm volatile(
+                "tcgen05.cp.cta_group::1.32x128b.warpx4 [%0], %1;"
+                :: "r"(tmem_sfb + blk * 4), "l"(sfb_desc) : "memory"
+            );
+        }
+    }
     asm volatile("tcgen05.wait::st.sync.aligned;" ::: "memory");
 }
 
@@ -435,6 +435,8 @@ gemm_kernel_tcgen05(const __grid_constant__ Gemm_params params)
 
     uint8_t* a_smem = reinterpret_cast<uint8_t*>(smem + SMEM_OFF_TILES);
     uint8_t* b_smem = reinterpret_cast<uint8_t*>(smem + SMEM_OFF_TILES + SMEM_A_TILE);
+    uint8_t* sfa_smem = reinterpret_cast<uint8_t*>(smem + SMEM_OFF_SFA);
+    uint8_t* sfb_smem = reinterpret_cast<uint8_t*>(smem + SMEM_OFF_SFB);
     uint32_t a_smem_addr = smem_base + SMEM_OFF_TILES;
     uint32_t b_smem_addr = smem_base + SMEM_OFF_TILES + SMEM_A_TILE;
     uint32_t sfa_smem_addr = smem_base + SMEM_OFF_SFA;
@@ -442,7 +444,7 @@ gemm_kernel_tcgen05(const __grid_constant__ Gemm_params params)
 
     // Size of each K chunk in smem (32 bytes * rows)
     const int a_chunk_bytes = 32 * MMA_M;  // 32 * 128 = 4096
-    const int b_chunk_bytes = 32 * MMA_N;  // 32 * 128 = 4096 (was 2048 for N=64)
+    const int b_chunk_bytes = 32 * MMA_N;  // 32 * 128 = 4096
 
     for (int k_tile = 0; k_tile < num_k_tiles; k_tile++) {
         const int k_offset = k_tile * MMA_K_TILE;
@@ -452,7 +454,7 @@ gemm_kernel_tcgen05(const __grid_constant__ Gemm_params params)
         tma_load_4x(&params.tensormap_a, m_block, k_bytes, a_smem_addr, mbar_tma_a, MMA_M);
         tma_load_4x(&params.tensormap_b, n_block, k_bytes, b_smem_addr, mbar_tma_b, MMA_N);
 
-        // TMA load scales (16 bytes = 4 k-tiles worth, aligned with our 256 K tile)
+        // TMA load scales (2048 bytes each for 4 k-tiles)
         tma_load_scales(&params.tensormap_sfa, &params.tensormap_sfb,
                         m_block, n_block, k_tile,
                         sfa_smem_addr, sfb_smem_addr,
@@ -462,6 +464,9 @@ gemm_kernel_tcgen05(const __grid_constant__ Gemm_params params)
         wait_tma_all_four(mbar_tma_a, tma_phase_a, mbar_tma_b, tma_phase_b,
                           mbar_tma_sfa, tma_phase_sfa, mbar_tma_sfb, tma_phase_sfb);
         __syncthreads();
+
+        // Copy all 4 k-blocks of scales to TMEM once per 256-K tile
+        copy_scales_smem_to_tmem(sfa_smem, sfb_smem, tmem_sfa, tmem_sfb);
 
         // Inner loop: 4 MMAs per TMA load
         #pragma unroll
@@ -475,12 +480,10 @@ gemm_kernel_tcgen05(const __grid_constant__ Gemm_params params)
             uint64_t a_desc = make_smem_desc(a_smem_k, 16, 256, 6);
             uint64_t b_desc = make_smem_desc(b_smem_k, 16, 256, 6);
 
-            // Copy scales from smem to tmem for this k_block
-            copy_scales_smem_to_tmem(sfa_smem_addr, sfb_smem_addr, tmem_sfa, tmem_sfb, k_block);
-
             // Issue MMA (accumulate after first MMA of first tile)
             bool accumulate = (k_tile > 0) || (k_block > 0);
-            issue_mma(tmem_d, a_desc, b_desc, idesc, tmem_sfa, tmem_sfb, mbar_mma, accumulate);
+            issue_mma(tmem_d, a_desc, b_desc, idesc,
+                tmem_sfa + 4 * k_block, tmem_sfb + 4 * k_block, mbar_mma, accumulate);
             wait_mma(mbar_mma, mma_phase);
         }
     }
@@ -524,17 +527,18 @@ void create_tensormap(CUtensorMap* tensormap, const void* data_ptr,
 }
 
 // ============================================================================
-// HOST: Create TensorMap for scales (no swizzle, 16 bytes per tile = 4 k-tiles)
+// HOST: Create TensorMap for permuted scales
+// Permuted layout: 512 bytes per k-tile, load 128 bytes at a time (TMA limit)
+// Issue 4 TMA loads per k-tile (4 * 128 = 512), 16 total for 4 k-tiles
 // ============================================================================
-void create_scale_tensormap(CUtensorMap* tensormap, const void* data_ptr,
-                            int rows, int k_scales, int row_stride_bytes, int box_rows)
+void create_scale_tensormap_perm(CUtensorMap* tensormap, const void* data_ptr,
+                                 int num_blocks, int num_k_tiles, int block_stride_bytes)
 {
-    // Scales: rows × k_scales layout, 1 byte per scale
-    // Box: 16 bytes (16 scales = 4 k-tiles worth) × box_rows
-    // TMA requires minimum 16 byte box dimension
-    uint64_t globalDim[2] = {(uint64_t)k_scales, (uint64_t)rows};
-    uint64_t globalStride[1] = {(uint64_t)row_stride_bytes};
-    uint32_t boxDim[2] = {16, (uint32_t)box_rows};  // 16 bytes minimum for TMA
+    // globalDim[0] = k dimension in bytes (num_k_tiles * 512 bytes per k-tile)
+    // globalDim[1] = number of M/N blocks
+    uint64_t globalDim[2] = {(uint64_t)(num_k_tiles * 512), (uint64_t)num_blocks};
+    uint64_t globalStride[1] = {(uint64_t)block_stride_bytes};
+    uint32_t boxDim[2] = {128, 1};  // 128 bytes per TMA load (max without swizzle)
     uint32_t elementStride[2] = {1, 1};
 
     CUresult result = cuTensorMapEncodeTiled(
@@ -547,16 +551,10 @@ void create_scale_tensormap(CUtensorMap* tensormap, const void* data_ptr,
         boxDim,
         elementStride,
         CU_TENSOR_MAP_INTERLEAVE_NONE,
-        CU_TENSOR_MAP_SWIZZLE_NONE,  // No swizzle for scales
+        CU_TENSOR_MAP_SWIZZLE_NONE,
         CU_TENSOR_MAP_L2_PROMOTION_NONE,
         CU_TENSOR_MAP_FLOAT_OOB_FILL_NONE
     );
-
-    if (result != CUDA_SUCCESS) {
-        const char* errStr;
-        cuGetErrorString(result, &errStr);
-        throw std::runtime_error(std::string("cuTensorMapEncodeTiled (scales) failed: ") + errStr);
-    }
 }
 
 torch::Tensor cuda_nvfp4_gemm_tcgen05(
@@ -569,7 +567,7 @@ torch::Tensor cuda_nvfp4_gemm_tcgen05(
     const int K = static_cast<int>(A.size(1)) * 2;
     const int N = static_cast<int>(B.size(0));
     const int K_bytes = K / 2;
-    const int K_scales = K / 16;  // One scale per 16 FP4 elements
+    const int num_k_tiles = K / MMA_K_MMA;  // Number of 64-element k-tiles
 
     Gemm_params params;
     params.M = M; params.N = N; params.K = K;
@@ -579,9 +577,18 @@ torch::Tensor cuda_nvfp4_gemm_tcgen05(
     create_tensormap(&params.tensormap_a, A.data_ptr(), M, K_bytes, A.stride(0), MMA_M);
     create_tensormap(&params.tensormap_b, B.data_ptr(), N, K_bytes, B.stride(0), MMA_N);
 
-    // Create tensormaps for scales (no swizzle)
-    create_scale_tensormap(&params.tensormap_sfa, SFA.data_ptr(), M, K_scales, SFA.stride(0), MMA_M);
-    create_scale_tensormap(&params.tensormap_sfb, SFB.data_ptr(), N, K_scales, SFB.stride(0), MMA_N);
+    // Use permuted scales - stride from dim 2 of perm tensor (block stride)
+    // SFA_perm shape: [32, 4, num_m_blocks, 4, num_k_tiles, 1]
+    // SFB_perm shape: [32, 4, num_n_blocks, 4, num_k_tiles, 1]
+    const int num_m_blocks = (M + MMA_M - 1) / MMA_M;
+    const int num_n_blocks = (N + MMA_N - 1) / MMA_N;
+    const int sfa_block_stride = SFA_perm.stride(2);  // stride to next M block
+    const int sfb_block_stride = SFB_perm.stride(2);  // stride to next N block
+
+    create_scale_tensormap_perm(&params.tensormap_sfa, SFA_perm.data_ptr(),
+                                num_m_blocks, num_k_tiles, sfa_block_stride);
+    create_scale_tensormap_perm(&params.tensormap_sfb, SFB_perm.data_ptr(),
+                                num_n_blocks, num_k_tiles, sfb_block_stride);
 
     dim3 grid_dim((N + MMA_N - 1) / MMA_N, (M + MMA_M - 1) / MMA_M, 1);
     dim3 block_dim(WARPS_PER_CTA * THREADS_PER_WARP);
