@@ -605,5 +605,5 @@ nvfp4_tcgen05_module = load_inline(
 def custom_kernel(data: input_t) -> output_t:
     a, b, sfa, sfb, sfa_perm, sfb_perm, c = data
     return nvfp4_tcgen05_module.cuda_nvfp4_gemm_tcgen05(
-        a, b, sfa, sfb, sfa_perm[:,:,:,:,:,0], sfb_perm[:,:,:,:,:,0], c
+        a, b, sfa, sfb, sfa_perm, sfb_perm, c
     )
