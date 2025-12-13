@@ -215,10 +215,12 @@ __device__ __forceinline__ void init_tmem_and_mbars(
 }
 
 // ============================================================================
-// TMA SCALE LOADING: 5D permuted layout using cp.async.bulk.tensor.5d
-// Permuted shape: [4 bytes][4 M-groups][32 rows][total_k_blocks][num_m_blocks]
-// Box constraint: box[0]*box[1]*box[2] <= 256, so we load 16 rows at a time
-// Two TMA loads per k_block (256 bytes each for rows 0-15 and 16-31), 8 loads per k_tile
+// TMA SCALE LOADING: 4D layout using cp.async.bulk.tensor.4d
+// 4D shape: [16 bytes per row][32 rows][total_k_blocks][num_m_blocks]
+// Strides: [16, 512, m_block_stride] — all >= 16 for TMA alignment ✓
+// Box: [16, 8, 1, 1] = 128 bytes per load (16 bytes × 8 rows)
+// Load each k_block in 4 pieces (rows 0-7, 8-15, 16-23, 24-31), 16 loads per k_tile
+// This preserves the [32 rows × 16 bytes] layout required by tcgen05.cp
 // ============================================================================
 __device__ __forceinline__ void tma_load_scales(
     const CUtensorMap* tensormap_sfa, const CUtensorMap* tensormap_sfb,
@@ -226,7 +228,7 @@ __device__ __forceinline__ void tma_load_scales(
     uint32_t sfa_smem_addr, uint32_t sfb_smem_addr,
     uint32_t mbar_sfa, uint32_t mbar_sfb)
 {
-    // Total bytes for 4 k_blocks = 2048 bytes (8 loads of 256 bytes each)
+    // Total bytes for 4 k_blocks = 2048 bytes (16 loads of 128 bytes each)
     const int total_bytes = 4 * 512;
 
     if (threadIdx.x == 0) {
@@ -235,30 +237,26 @@ __device__ __forceinline__ void tma_load_scales(
             :: "r"(mbar_sfa), "r"(total_bytes) : "memory"
         );
 
-        // Load 4 k_blocks, 2 TMA loads each (rows 0-15 and 16-31)
+        // Load 4 k_blocks, 4 TMA loads each (8 rows × 16 bytes = 128 bytes per load)
         #pragma unroll
         for (int b = 0; b < 4; b++) {
             int k_block_idx = k_tile * 4 + b;
-            // First half: rows 0-15 (256 bytes)
-            uint32_t smem_addr0 = sfa_smem_addr + b * 512;
-            asm volatile(
-                "cp.async.bulk.tensor.5d.shared::cluster.global.mbarrier::complete_tx::bytes"
-                " [%0], [%1, {%2, %3, %4, %5, %6}], [%7];"
-                :: "r"(smem_addr0), "l"(tensormap_sfa),
-                   "r"(0), "r"(0), "r"(0), "r"(k_block_idx), "r"(m_idx),
-                   "r"(mbar_sfa)
-                : "memory"
-            );
-            // Second half: rows 16-31 (256 bytes)
-            uint32_t smem_addr1 = sfa_smem_addr + b * 512 + 256;
-            asm volatile(
-                "cp.async.bulk.tensor.5d.shared::cluster.global.mbarrier::complete_tx::bytes"
-                " [%0], [%1, {%2, %3, %4, %5, %6}], [%7];"
-                :: "r"(smem_addr1), "l"(tensormap_sfa),
-                   "r"(0), "r"(0), "r"(16), "r"(k_block_idx), "r"(m_idx),
-                   "r"(mbar_sfa)
-                : "memory"
-            );
+            #pragma unroll
+            for (int r = 0; r < 4; r++) {
+                // Each load: 16 bytes × 8 rows = 128 bytes
+                // SMEM offset: k_block * 512 + row_chunk * 128
+                // This gives contiguous [32 rows × 16 bytes] layout per k_block
+                uint32_t smem_addr = sfa_smem_addr + b * 512 + r * 128;
+                int row_coord = r * 8;  // Starting row (0, 8, 16, 24)
+                asm volatile(
+                    "cp.async.bulk.tensor.4d.shared::cluster.global.mbarrier::complete_tx::bytes"
+                    " [%0], [%1, {%2, %3, %4, %5}], [%6];"
+                    :: "r"(smem_addr), "l"(tensormap_sfa),
+                       "r"(0), "r"(row_coord), "r"(k_block_idx), "r"(m_idx),
+                       "r"(mbar_sfa)
+                    : "memory"
+                );
+            }
         }
 
         asm volatile(
@@ -269,26 +267,19 @@ __device__ __forceinline__ void tma_load_scales(
         #pragma unroll
         for (int b = 0; b < 4; b++) {
             int k_block_idx = k_tile * 4 + b;
-            // First half: rows 0-15 (256 bytes)
-            uint32_t smem_addr0 = sfb_smem_addr + b * 512;
-            asm volatile(
-                "cp.async.bulk.tensor.5d.shared::cluster.global.mbarrier::complete_tx::bytes"
-                " [%0], [%1, {%2, %3, %4, %5, %6}], [%7];"
-                :: "r"(smem_addr0), "l"(tensormap_sfb),
-                   "r"(0), "r"(0), "r"(0), "r"(k_block_idx), "r"(n_idx),
-                   "r"(mbar_sfb)
-                : "memory"
-            );
-            // Second half: rows 16-31 (256 bytes)
-            uint32_t smem_addr1 = sfb_smem_addr + b * 512 + 256;
-            asm volatile(
-                "cp.async.bulk.tensor.5d.shared::cluster.global.mbarrier::complete_tx::bytes"
-                " [%0], [%1, {%2, %3, %4, %5, %6}], [%7];"
-                :: "r"(smem_addr1), "l"(tensormap_sfb),
-                   "r"(0), "r"(0), "r"(16), "r"(k_block_idx), "r"(n_idx),
-                   "r"(mbar_sfb)
-                : "memory"
-            );
+            #pragma unroll
+            for (int r = 0; r < 4; r++) {
+                uint32_t smem_addr = sfb_smem_addr + b * 512 + r * 128;
+                int row_coord = r * 8;
+                asm volatile(
+                    "cp.async.bulk.tensor.4d.shared::cluster.global.mbarrier::complete_tx::bytes"
+                    " [%0], [%1, {%2, %3, %4, %5}], [%6];"
+                    :: "r"(smem_addr), "l"(tensormap_sfb),
+                       "r"(0), "r"(row_coord), "r"(k_block_idx), "r"(n_idx),
+                       "r"(mbar_sfb)
+                    : "memory"
+                );
+            }
         }
     }
 }
@@ -545,27 +536,28 @@ void create_tensormap(CUtensorMap* tensormap, const void* data_ptr,
 }
 
 // ============================================================================
-// HOST: Create 5D TensorMap for permuted scales
-// Permuted shape: [4 bytes][4 M-groups][32 rows][total_k_blocks][num_m_blocks]
-// Strides:        [1,       4,          16,      512,            m_block_stride]
-// Box: [4, 4, 16, 1, 1] = 256 bytes (half a k_block, constraint: box[0]*box[1]*box[2] <= 256)
-// Need 2 TMA loads per k_block (rows 0-15 and 16-31)
+// HOST: Create 4D TensorMap for permuted scales
+// 4D shape: [16 bytes per row][32 rows][total_k_blocks][num_m_blocks]
+// Strides: [16, 512, m_block_stride] — all >= 16 for TMA alignment ✓
+// Box: [16, 8, 1, 1] = 128 bytes per load (16 bytes × 8 rows)
+// Load 4 times per k_block (rows 0-7, 8-15, 16-23, 24-31)
 // ============================================================================
-void create_scale_tensormap_5d(CUtensorMap* tensormap, const void* data_ptr,
+void create_scale_tensormap_4d(CUtensorMap* tensormap, const void* data_ptr,
                                int num_m_blocks, int total_k_blocks, int m_block_stride)
 {
-    // 5D: [bytes_per_group, m_groups, rows, k_blocks, m_blocks]
-    uint64_t globalDim[5] = {4, 4, 32, (uint64_t)total_k_blocks, (uint64_t)num_m_blocks};
-    // Strides for dims 1-4 (dim 0 has implicit stride of 1)
-    uint64_t globalStride[4] = {4, 16, 512, (uint64_t)m_block_stride};
-    // Box loads 256 bytes (half k_block): boxDim[0]*boxDim[1]*boxDim[2] must be <= 256
-    uint32_t boxDim[5] = {4, 4, 16, 1, 1};
-    uint32_t elementStride[5] = {1, 1, 1, 1, 1};
+    // 4D: [bytes_per_row, rows, k_blocks, m_blocks]
+    uint64_t globalDim[4] = {16, 32, (uint64_t)total_k_blocks, (uint64_t)num_m_blocks};
+    // Strides for dims 1-3 (dim 0 has implicit stride of 1)
+    // All strides >= 16 to satisfy TMA alignment requirements
+    uint64_t globalStride[3] = {16, 512, (uint64_t)m_block_stride};
+    // Box loads 128 bytes: 16 bytes × 8 rows (preserves row layout for tcgen05.cp)
+    uint32_t boxDim[4] = {16, 8, 1, 1};
+    uint32_t elementStride[4] = {1, 1, 1, 1};
 
     CUresult result = cuTensorMapEncodeTiled(
         tensormap,
         CU_TENSOR_MAP_DATA_TYPE_UINT8,
-        5,
+        4,
         const_cast<void*>(data_ptr),
         globalDim,
         globalStride,
@@ -580,7 +572,7 @@ void create_scale_tensormap_5d(CUtensorMap* tensormap, const void* data_ptr,
     if (result != CUDA_SUCCESS) {
         const char* errStr;
         cuGetErrorString(result, &errStr);
-        throw std::runtime_error(std::string("Scale tensormap 5D failed: ") + errStr);
+        throw std::runtime_error(std::string("Scale tensormap 4D failed: ") + errStr);
     }
 }
 
@@ -614,11 +606,11 @@ torch::Tensor cuda_nvfp4_gemm_tcgen05(
     create_tensormap(&params.tensormap_a, A.data_ptr(), M, K_bytes, A.stride(0), MMA_M);
     create_tensormap(&params.tensormap_b, B.data_ptr(), N, K_bytes, B.stride(0), MMA_N);
 
-    // Use 5D permuted scales
-    // Permuted shape: [4][4][32][total_k_blocks][num_m_blocks] with interleaved layout
-    create_scale_tensormap_5d(&params.tensormap_sfa, SFA_perm.data_ptr(),
+    // Use 4D permuted scales (avoids stride < 16 alignment issue)
+    // 4D shape: [16 bytes per row][32 rows][total_k_blocks][num_m/n_blocks]
+    create_scale_tensormap_4d(&params.tensormap_sfa, SFA_perm.data_ptr(),
                               num_m_blocks, total_k_blocks, sfa_m_block_stride);
-    create_scale_tensormap_5d(&params.tensormap_sfb, SFB_perm.data_ptr(),
+    create_scale_tensormap_4d(&params.tensormap_sfb, SFB_perm.data_ptr(),
                               num_n_blocks, total_k_blocks, sfb_m_block_stride);
 
     dim3 grid_dim((N + MMA_N - 1) / MMA_N, (M + MMA_M - 1) / MMA_M, 1);
