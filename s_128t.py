@@ -212,6 +212,7 @@ __device__ __forceinline__ void init_tmem_and_mbars(
             :: "r"(mbar_tma_sfb), "r"(1) : "memory");
     }
     __syncthreads();
+
 }
 
 // ============================================================================
@@ -293,13 +294,13 @@ __device__ __forceinline__ void copy_scale_block_to_tmem(
     uint32_t tmem_sfa, uint32_t tmem_sfb)
 {
     // warpx4 variant requires participation from 4 warps; let the whole CTA issue it.
-    if (threadIdx.x == 0) {
+    //if ((threadIdx.x % 32) == 0) {
         uint64_t sfa_desc = make_smem_desc(sfa_smem, 16, 16, 0);
         uint64_t sfb_desc = make_smem_desc(sfb_smem, 16, 16, 0);
         asm volatile("tcgen05.cp.cta_group::1.32x128b.warpx4 [%0], %1;" :: "r"(tmem_sfa), "l"(sfa_desc) : "memory");
         asm volatile("tcgen05.cp.cta_group::1.32x128b.warpx4 [%0], %1;" :: "r"(tmem_sfb), "l"(sfb_desc) : "memory");
         asm volatile("tcgen05.wait::st.sync.aligned;" ::: "memory");
-    }
+    //}
 }
 
 // ============================================================================
@@ -415,6 +416,8 @@ gemm_kernel_tcgen05(const __grid_constant__ Gemm_params params)
     uint32_t tmem_d, tmem_sfa, tmem_sfb;
     init_tmem_and_mbars(smem, smem_base, mbar_mma, mbar_tma_a, mbar_tma_b,
                         mbar_tma_sfa, mbar_tma_sfb, tmem_d, tmem_sfa, tmem_sfb);
+
+
     uint32_t idesc = make_mxf4_idesc(MMA_M, MMA_N);
     const int num_k_tiles = params.K / MMA_K_TILE;  // Outer loop over 256-K tiles
     int mma_phase = 0;
@@ -455,6 +458,7 @@ gemm_kernel_tcgen05(const __grid_constant__ Gemm_params params)
                           mbar_tma_sfa, tma_phase_sfa, mbar_tma_sfb, tma_phase_sfb);
         __syncthreads();
 
+
         // Inner loop: 4 MMAs per TMA load
         #pragma unroll
         for (int k_block = 0; k_block < K_BLOCKS; k_block++) {
@@ -493,7 +497,7 @@ void create_tensormap(CUtensorMap* tensormap, const void* data_ptr,
 {
     uint64_t globalDim[2] = {(uint64_t)k_bytes, (uint64_t)rows};
     uint64_t globalStride[1] = {(uint64_t)row_stride_bytes};
-    uint32_t boxDim[2] = {32, (uint32_t)box_rows};  // 32 bytes per TMA load (SWIZZLE_32B requires box=32)
+    uint32_t boxDim[2] = {32, (uint32_t)box_rows}; 
     uint32_t elementStride[2] = {1, 1};
 
     CUresult result = cuTensorMapEncodeTiled(
