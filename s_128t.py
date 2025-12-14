@@ -272,8 +272,8 @@ __device__ __forceinline__ void copy_scale_block_to_tmem(
 {
     // warpx4 variant requires participation from 4 warps; let the whole CTA issue it.
     //if ((threadIdx.x % 32) == 0) {
-        uint64_t sfa_desc = make_smem_desc(sfa_smem, 16, 16, 0);
-        uint64_t sfb_desc = make_smem_desc(sfb_smem, 16, 16, 0);
+        uint64_t sfa_desc = make_smem_desc(sfa_smem, 128, 128, 0);
+        uint64_t sfb_desc = make_smem_desc(sfb_smem, 128, 128, 0);
         asm volatile("tcgen05.cp.cta_group::1.32x128b.warpx4 [%0], %1;" :: "r"(tmem_sfa), "l"(sfa_desc) : "memory");
         asm volatile("tcgen05.cp.cta_group::1.32x128b.warpx4 [%0], %1;" :: "r"(tmem_sfb), "l"(sfb_desc) : "memory");
         asm volatile("tcgen05.wait::st.sync.aligned;" ::: "memory");

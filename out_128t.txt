@@ -1,7 +1,7 @@
 "**NVIDIA on GitHub ✅ success**
-> Workflow [20199852103](<https://github.com/gpu-mode/discord-cluster-manager/actions/runs/20199852103>) completed
+> Workflow [20200213439](<https://github.com/gpu-mode/discord-cluster-manager/actions/runs/20200213439>) completed
 > Downloading artifacts... done
-> ❌ Benchmarking failed
+> ✅ Benchmarking successful
 
 Running on:
 * GPU: `NVIDIA B200`
@@ -13,15 +13,15 @@ Running on:
 
 ## Benchmarks:
 ```
-❌ k: 16384; l: 1; m: 128; n: 7168; seed: 1111 failed testing:
+k: 16384; l: 1; m: 128; n: 7168; seed: 1111
+ ⏱ 459 ± 0.1 µs
+ ⚡ 459 µs 🐌 460 µs
 
-mismatch found! custom implementation doesn't match reference: Number of mismatched elements: 859654 ERROR AT (0, 8, 0): 6472.0 1219.0 ERROR AT (0, 9, 0): -1589.0 -5764.0 ERROR AT (0, 10, 0): 443.5 -3084.0 ERROR AT (0, 11, 0): -5248.0 -5604.0 ERROR AT (0, 12, 0): 7168.0 1470.0 ... and 859649 more mismatched elements.
+k: 7168; l: 1; m: 128; n: 4096; seed: 1111
+ ⏱ 211 ± 0.0 µs
+ ⚡ 211 µs 🐌 211 µs
 
-❌ k: 7168; l: 1; m: 128; n: 4096; seed: 1111 failed testing:
-
-mismatch found! custom implementation doesn't match reference: Number of mismatched elements: 491215 ERROR AT (0, 8, 0): 1748.0 1832.0 ERROR AT (0, 9, 0): 1192.0 1262.0 ERROR AT (0, 10, 0): -4184.0 -4232.0 ERROR AT (0, 11, 0): 1556.0 1273.0 ERROR AT (0, 12, 0): 3384.0 -828.0 ... and 491210 more mismatched elements.
-
-❌ k: 2048; l: 1; m: 128; n: 7168; seed: 1111 failed testing:
-
-mismatch found! custom implementation doesn't match reference: Number of mismatched elements: 859652 ERROR AT (0, 8, 0): 263.5 3222.0 ERROR AT (0, 9, 0): -2194.0 -942.0 ERROR AT (0, 10, 0): -644.0 177.75 ERROR AT (0, 11, 0): -710.5 172.0 ERROR AT (0, 12, 0): 1453.0 1956.0 ... and 859647 more mismatched elements.
+k: 2048; l: 1; m: 128; n: 7168; seed: 1111
+ ⏱ 82.7 ± 0.04 µs
+ ⚡ 82.7 µs 🐌 82.8 µs
 ```"
