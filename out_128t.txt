@@ -1,5 +1,5 @@
 "**NVIDIA on GitHub ✅ success**
-> Workflow [20191268529](<https://github.com/gpu-mode/discord-cluster-manager/actions/runs/20191268529>) completed
+> Workflow [20199852103](<https://github.com/gpu-mode/discord-cluster-manager/actions/runs/20199852103>) completed
 > Downloading artifacts... done
 > ❌ Benchmarking failed
 
